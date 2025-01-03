@@ -53,9 +53,11 @@ int smf_use_gy_iface(void)
 {
     switch (smf_self()->ctf_config.enabled) {
     case SMF_CTF_ENABLED_AUTO:
-        return ogs_diam_app_connected(OGS_DIAM_GY_APPLICATION_ID) ? 1 : 0;
+        return ogs_diam_is_relay_or_app_advertised(
+                OGS_DIAM_GY_APPLICATION_ID) ? 1 : 0;
     case SMF_CTF_ENABLED_YES:
-        return ogs_diam_app_connected(OGS_DIAM_GY_APPLICATION_ID) ? 1 : -1;
+        return ogs_diam_is_relay_or_app_advertised(
+                OGS_DIAM_GY_APPLICATION_ID) ? 1 : -1;
     case SMF_CTF_ENABLED_NO:
         return 0;
     default:
@@ -3116,7 +3118,10 @@ int smf_pco_build(uint8_t *pco_buf, uint8_t *buffer, int length)
             /* TODO */
             break;
         case OGS_PCO_ID_MS_SUPPORT_LOCAL_ADDR_TFT_INDICATOR:
-            /* TODO */
+            smf.ids[smf.num_of_id].id = ue.ids[i].id;
+            smf.ids[smf.num_of_id].len = 0;
+            smf.ids[smf.num_of_id].data = 0;
+            smf.num_of_id++;
             break;
         case OGS_PCO_ID_P_CSCF_RE_SELECTION_SUPPORT:
             /* TODO */
