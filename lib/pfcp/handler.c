@@ -269,7 +269,8 @@ bool ogs_pfcp_up_handle_pdr(
                     sendhdr.pdcp_number = recvhdr->pdcp_number;
                 }
             }
-
+	    ogs_info("RECVBUF before ogs_pfcp_send_g_pdu is called");
+	    ogs_log_hexdump(OGS_LOG_ERROR, sendbuf->data, sendbuf->len);
             ogs_pfcp_send_g_pdu(pdr, &sendhdr, sendbuf);
 
         } else if (far->apply_action & OGS_PFCP_APPLY_ACTION_BUFF) {

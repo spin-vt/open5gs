@@ -113,6 +113,10 @@ int ogs_gtp_sendto(ogs_gtp_node_t *gnode, ogs_pkbuf_t *pkbuf)
     addr = &gnode->addr;
     ogs_assert(addr);
 
+    ogs_info("PKBUF before ogs_sendto is called");
+    ogs_log_hexdump(OGS_LOG_ERROR, pkbuf->data, pkbuf->len);
+
+    ogs_info("sendto fd: %u", sock->fd);
     sent = ogs_sendto(sock->fd, pkbuf->data, pkbuf->len, 0, addr);
     if (sent < 0 || sent != pkbuf->len) {
         if (ogs_socket_errno != OGS_EAGAIN) {

@@ -394,6 +394,9 @@ void ogs_pfcp_send_g_pdu(
         header_desc.pdcp_number = sendhdr->pdcp_number;
     }
 
+    ogs_info("RECVBUF before ogs_gtp2_send_user_plane is called");
+    ogs_log_hexdump(OGS_LOG_ERROR, sendbuf->data, sendbuf->len);
+
     ogs_gtp2_send_user_plane(gnode, &header_desc, sendbuf);
 }
 

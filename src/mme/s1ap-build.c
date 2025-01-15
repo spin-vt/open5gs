@@ -400,6 +400,8 @@ static void fill_e_rab_to_be_setup(
 
     rv = ogs_asn_ip_to_BIT_STRING(
             &bearer->sgw_s1u_ip, &e_rab->transportLayerAddress);
+    ogs_info(" ------> SGWU IP: [%s]",ogs_ipv4_to_string(bearer->sgw_s1u_ip.addr));
+    ogs_info(" ------> SGWU IP as int32: [%u]", bearer->sgw_s1u_ip.addr);
     ogs_assert(rv == OGS_OK);
     ogs_asn_uint32_to_OCTET_STRING(
             bearer->sgw_s1u_teid, &e_rab->gTP_TEID);

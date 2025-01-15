@@ -55,6 +55,10 @@
 
 #define UPF_GTP_HANDLED     1
 
+#define ENB_GTP_IP "127.0.1.1"
+static int gtp_fd;
+static int tun_fd;
+
 const uint8_t proxy_mac_addr[] = { 0x0e, 0x00, 0x00, 0x00, 0x00, 0x01 };
 
 static ogs_pkbuf_pool_t *packet_pool = NULL;
@@ -163,9 +167,57 @@ static void _gtpv1_tun_recv_common_cb(
         ogs_pkbuf_pull(recvbuf, ETHER_HDR_LEN);
     }
 
+
+    ogs_info("----------> [DL] PKBUF before session check:");
+    ogs_log_hexdump(OGS_LOG_ERROR, recvbuf->data, recvbuf->len);
+
     sess = upf_sess_find_by_ue_ip_address(recvbuf);
-    if (!sess)
+    if (!sess) {
+	    ogs_info("----------> [DL] No UPF session found, going to clean up.");
+        // Add appropriate packet headers
+
+        // ogs_gtp2_header_desc_t sendhdr;
+        // memset(&sendhdr, 0, sizeof(sendhdr));
+
+        ogs_gtp2_header_t mod_gtp_hdesc;
+        ogs_gtp2_extension_header_t mod_ext_hdesc;
+
+        memset(&mod_gtp_hdesc, 0, sizeof(mod_gtp_hdesc));
+        memset(&mod_ext_hdesc, 0, sizeof(mod_ext_hdesc));
+
+        mod_gtp_hdesc.flags = 0; // should just be zero
+        mod_gtp_hdesc.type = 255; // G-PDU -- 255
+        mod_gtp_hdesc.teid = 1; // TODO - how to pick TEID? for now, just implement and see how srsenb responds... It looks like 1 is used pretty often for SGWU?
+
+        ogs_gtp2_fill_header(&mod_gtp_hdesc, &mod_ext_hdesc, recvbuf);
+
+        ogs_info("----------> [DL] PKBUF after ogs_gtp2_fill_header in bypass branch");
+        ogs_log_hexdump(OGS_LOG_ERROR, recvbuf->data, recvbuf->len);
+
+        // Then, need to send it to the right sock addr
+        struct sockaddr_in dst_addr;
+        memset(&dst_addr, 0, sizeof(dst_addr));
+        dst_addr.sin_family = AF_INET;
+        dst_addr.sin_port = htons(2152);
+        if (inet_pton(AF_INET, ENB_GTP_IP, &dst_addr.sin_addr) <= 0) {
+            ogs_error("----------> [DL] Couldn't build sockaddr for sendto() in bypass branch");
+            goto cleanup;
+        }
+
+        // I'm not sure what FD to use -- I assume the GTP Server is appropriate, but I see both 14 and 15 used often
+        ssize_t sent = sendto(gtp_fd, recvbuf->data, recvbuf->len, 0, (const struct sockaddr *)&dst_addr, sizeof(dst_addr));
+
+        if (sent < 0 || sent != recvbuf->len) {
+            if (ogs_socket_errno != OGS_EAGAIN) {
+                int err = ogs_socket_errno;
+                ogs_log_message(OGS_LOG_ERROR, err,
+                        "sendto(%u, %p, %u, 0, ...) failed",
+                        gtp_fd, recvbuf->data, recvbuf->len);
+            }
+        }
+        
         goto cleanup;
+    }
 
     ogs_list_for_each(&sess->pfcp.pdr_list, pdr) {
         far = pdr->far;
@@ -213,6 +265,8 @@ static void _gtpv1_tun_recv_common_cb(
     for (i = 0; i < pdr->num_of_urr; i++)
         upf_sess_urr_acc_add(sess, pdr->urr[i], recvbuf->len, false);
 
+    ogs_info("PKBUF right before ogs_pfcp_up_handle_pdr call");
+    ogs_log_hexdump(OGS_LOG_ERROR, recvbuf->data, recvbuf->len);
     ogs_assert(true == ogs_pfcp_up_handle_pdr(
                 pdr, OGS_GTPU_MSGTYPE_GPDU, NULL, recvbuf, &report));
 
@@ -503,10 +557,18 @@ static void _gtpv1_u_recv_cb(short when, ogs_socket_t fd, void *data)
         far = pdr->far;
         ogs_assert(far);
 
-        if (ip_h->ip_v == 4 && sess->ipv4) {
-            src_addr = (void *)&ip_h->ip_src.s_addr;
-            ogs_assert(src_addr);
+	ogs_info("-----> IPv:%u Sess: %s", ip_h->ip_v, sess->ipv4? "true" : "false");
 
+        if (ip_h->ip_v == 4 && sess->ipv4) {
+            
+	    ogs_info("-----> IPv:%u, Sess IP: %u.%u.%u.%u", ip_h->ip_v, sess->ipv4->addr[0], sess->ipv4->addr[1], sess->ipv4->addr[2], sess->ipv4->addr[3]);
+	    ogs_info("-----> Sess DNN: %u", sess->ipv4->subnet->dev->fd);
+	    src_addr = (void *)&ip_h->ip_src.s_addr;
+            ogs_assert(src_addr);
+	    ogs_info("Hex dump at session object check:");
+	    ogs_log_hexdump(OGS_LOG_ERROR, pkbuf->data, pkbuf->len);
+            
+	
             /*
              * From Issue #1354
              *
@@ -609,7 +671,8 @@ static void _gtpv1_u_recv_cb(short when, ogs_socket_t fd, void *data)
                             be32toh(sess->ipv6->addr[1]),
                             be32toh(sess->ipv6->addr[2]),
                             be32toh(sess->ipv6->addr[3]));
-                    ogs_log_hexdump(OGS_LOG_ERROR, pkbuf->data, pkbuf->len);
+                    
+		    ogs_log_hexdump(OGS_LOG_ERROR, pkbuf->data, pkbuf->len);
 
                     goto cleanup;
                 }
@@ -619,10 +682,15 @@ static void _gtpv1_u_recv_cb(short when, ogs_socket_t fd, void *data)
             eth_type = ETHERTYPE_IPV6;
 
         } else {
-            ogs_error("Invalid packet [IP version:%d, Packet Length:%d]",
+            ogs_info("Packet received direct from eNB [IP version:%d, Packet Length:%d]",
                     ip_h->ip_v, pkbuf->len);
             ogs_log_hexdump(OGS_LOG_ERROR, pkbuf->data, pkbuf->len);
-            goto cleanup;
+            
+	    int tun_success = ogs_tun_write(tun_fd, pkbuf);
+	    
+	    ogs_info("---------> tun write success? %u", tun_success == OGS_OK);
+
+	    goto cleanup;
         }
 
         if (far->dst_if == OGS_PFCP_INTERFACE_CORE) {
@@ -653,6 +721,7 @@ static void _gtpv1_u_recv_cb(short when, ogs_socket_t fd, void *data)
                 ogs_pkbuf_push(pkbuf, ETHER_ADDR_LEN);
                 memcpy(pkbuf->data, dev->mac_addr, ETHER_ADDR_LEN);
             }
+
 
             /* TODO: if destined to another UE, hairpin back out. */
             if (ogs_tun_write(dev->fd, pkbuf) != OGS_OK)
@@ -774,8 +843,9 @@ int upf_gtp_open(void)
     ogs_sock_t *sock = NULL;
     int rc;
 
+    ogs_info("--------> gtp open called");
     ogs_list_for_each(&ogs_gtp_self()->gtpu_list, node) {
-        sock = ogs_gtp_server(node);
+	sock = ogs_gtp_server(node);
         if (!sock) return OGS_ERROR;
 
         if (sock->family == AF_INET)
@@ -785,8 +855,12 @@ int upf_gtp_open(void)
 
         node->poll = ogs_pollset_add(ogs_app()->pollset,
                 OGS_POLLIN, sock->fd, _gtpv1_u_recv_cb, sock);
+        ogs_info("----------> sock->fd after ogs_tun_open: %u", sock->fd);
+        gtp_fd = sock->fd;
+        ogs_info("----------> gtp_fd is now: %u", gtp_fd);
         ogs_assert(node->poll);
     }
+
 
     OGS_SETUP_GTPU_SERVER;
 
@@ -803,12 +877,17 @@ int upf_gtp_open(void)
 
     /* Open Tun interface */
     ogs_list_for_each(&ogs_pfcp_self()->dev_list, dev) {
-        dev->is_tap = strstr(dev->ifname, "tap");
+        ogs_info("----------> testing testing");
+	    
+	dev->is_tap = strstr(dev->ifname, "tap");
         dev->fd = ogs_tun_open(dev->ifname, OGS_MAX_IFNAME_LEN, dev->is_tap);
         if (dev->fd == INVALID_SOCKET) {
             ogs_error("tun_open(dev:%s) failed", dev->ifname);
             return OGS_ERROR;
         }
+	ogs_info("----------> dev->fd after ogs_tun_open: %u", dev->fd);
+	tun_fd = dev->fd;
+	ogs_info("----------> tun_fd is now: %u", tun_fd);
 
         if (dev->is_tap) {
             _get_dev_mac_addr(dev->ifname, dev->mac_addr);
