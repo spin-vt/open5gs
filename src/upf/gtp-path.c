@@ -56,6 +56,7 @@
 #define UPF_GTP_HANDLED     1
 
 #define ENB_GTP_IP "127.0.1.1"
+#define ENB_GTP_IP_2 "127.0.1.2"
 static int gtp_fd;
 static int tun_fd;
 
@@ -167,9 +168,49 @@ static void _gtpv1_tun_recv_common_cb(
         ogs_pkbuf_pull(recvbuf, ETHER_HDR_LEN);
     }
 
+    ogs_gtp2_header_t mod_gtp_hdesc;
+    ogs_gtp2_extension_header_t mod_ext_hdesc;
 
-    ogs_info("----------> [DL] PKBUF before session check:");
-    ogs_log_hexdump(OGS_LOG_ERROR, recvbuf->data, recvbuf->len);
+    memset(&mod_gtp_hdesc, 0, sizeof(mod_gtp_hdesc));
+    memset(&mod_ext_hdesc, 0, sizeof(mod_ext_hdesc));
+
+    mod_gtp_hdesc.flags = 0; // should just be zero
+    mod_gtp_hdesc.type = 255; // G-PDU -- 255
+    mod_gtp_hdesc.teid = 1; // TODO - how to pick TEID? for now, just implement and see how srsenb responds... It looks like 1 is used pretty often for SGWU?
+
+    ogs_gtp2_fill_header(&mod_gtp_hdesc, &mod_ext_hdesc, recvbuf);
+
+    // ogs_info("----------> [DL] PKBUF after ogs_gtp2_fill_header in bypass branch");
+    // ogs_log_hexdump(OGS_LOG_ERROR, recvbuf->data, recvbuf->len);
+
+    // Then, need to send it to the right sock addr
+    struct sockaddr_in dst_addr;
+    memset(&dst_addr, 0, sizeof(dst_addr));
+    dst_addr.sin_family = AF_INET;
+    dst_addr.sin_port = htons(2152);
+    ogs_info("-----------> OK, i'm hitting the right branch.");
+    if (inet_pton(AF_INET, ENB_GTP_IP_2, &dst_addr.sin_addr) <= 0) {
+        ogs_error("----------> [DL] Couldn't build sockaddr for sendto() in bypass branch");
+        goto cleanup;
+    }
+
+    // I'm not sure what FD to use -- I assume the GTP Server is appropriate, but I see both 14 and 15 used often
+    ssize_t sent = sendto(gtp_fd, recvbuf->data, recvbuf->len, 0, (const struct sockaddr *)&dst_addr, sizeof(dst_addr));
+
+    if (sent < 0 || sent != recvbuf->len) {
+        if (ogs_socket_errno != OGS_EAGAIN) {
+            int err = ogs_socket_errno;
+            ogs_log_message(OGS_LOG_ERROR, err,
+                    "sendto(%u, %p, %u, 0, ...) failed",
+                    gtp_fd, recvbuf->data, recvbuf->len);
+        }
+    }
+    
+    goto cleanup;
+
+
+    // ogs_info("----------> [DL] PKBUF before session check:");
+    // ogs_log_hexdump(OGS_LOG_ERROR, recvbuf->data, recvbuf->len);
 
     sess = upf_sess_find_by_ue_ip_address(recvbuf);
     if (!sess) {
@@ -191,14 +232,15 @@ static void _gtpv1_tun_recv_common_cb(
 
         ogs_gtp2_fill_header(&mod_gtp_hdesc, &mod_ext_hdesc, recvbuf);
 
-        ogs_info("----------> [DL] PKBUF after ogs_gtp2_fill_header in bypass branch");
-        ogs_log_hexdump(OGS_LOG_ERROR, recvbuf->data, recvbuf->len);
+        // ogs_info("----------> [DL] PKBUF after ogs_gtp2_fill_header in bypass branch");
+        // ogs_log_hexdump(OGS_LOG_ERROR, recvbuf->data, recvbuf->len);
 
         // Then, need to send it to the right sock addr
         struct sockaddr_in dst_addr;
         memset(&dst_addr, 0, sizeof(dst_addr));
         dst_addr.sin_family = AF_INET;
         dst_addr.sin_port = htons(2152);
+        ogs_info("-----------> OK, i'm hitting the right branch.");
         if (inet_pton(AF_INET, ENB_GTP_IP, &dst_addr.sin_addr) <= 0) {
             ogs_error("----------> [DL] Couldn't build sockaddr for sendto() in bypass branch");
             goto cleanup;
@@ -265,8 +307,8 @@ static void _gtpv1_tun_recv_common_cb(
     for (i = 0; i < pdr->num_of_urr; i++)
         upf_sess_urr_acc_add(sess, pdr->urr[i], recvbuf->len, false);
 
-    ogs_info("PKBUF right before ogs_pfcp_up_handle_pdr call");
-    ogs_log_hexdump(OGS_LOG_ERROR, recvbuf->data, recvbuf->len);
+    // ogs_info("PKBUF right before ogs_pfcp_up_handle_pdr call");
+    // ogs_log_hexdump(OGS_LOG_ERROR, recvbuf->data, recvbuf->len);
     ogs_assert(true == ogs_pfcp_up_handle_pdr(
                 pdr, OGS_GTPU_MSGTYPE_GPDU, NULL, recvbuf, &report));
 
@@ -455,6 +497,16 @@ static void _gtpv1_u_recv_cb(short when, ogs_socket_t fd, void *data)
                 UPF_METR_CTR_GTP_INDATAVOLUMEQOSLEVELN3UPF, pkbuf->len);
 #endif
 
+        ogs_info("Packet received direct from eNB [IP version:%d, Packet Length:%d]",
+            ip_h->ip_v, pkbuf->len);
+        ogs_log_hexdump(OGS_LOG_ERROR, pkbuf->data, pkbuf->len);
+        
+        int tun_success = ogs_tun_write(tun_fd, pkbuf);
+    
+        ogs_info("---------> tun write success? %u", tun_success == OGS_OK);
+
+        goto cleanup;
+
         pfcp_object = ogs_pfcp_object_find_by_teid(header_desc.teid);
         if (!pfcp_object) {
             /*
@@ -516,6 +568,16 @@ static void _gtpv1_u_recv_cb(short when, ogs_socket_t fd, void *data)
             }
 
             if (!pdr) {
+                ogs_info("Packet received direct from eNB [IP version:%d, Packet Length:%d]",
+                    ip_h->ip_v, pkbuf->len);
+                ogs_log_hexdump(OGS_LOG_ERROR, pkbuf->data, pkbuf->len);
+                
+                int tun_success = ogs_tun_write(tun_fd, pkbuf);
+            
+                ogs_info("---------> tun write success? %u", tun_success == OGS_OK);
+
+                goto cleanup;
+
                 /*
                  * TS23.527 Restoration procedures
                  * 4.3 UPF Restoration Procedures
@@ -561,12 +623,12 @@ static void _gtpv1_u_recv_cb(short when, ogs_socket_t fd, void *data)
 
         if (ip_h->ip_v == 4 && sess->ipv4) {
             
-	    ogs_info("-----> IPv:%u, Sess IP: %u.%u.%u.%u", ip_h->ip_v, sess->ipv4->addr[0], sess->ipv4->addr[1], sess->ipv4->addr[2], sess->ipv4->addr[3]);
-	    ogs_info("-----> Sess DNN: %u", sess->ipv4->subnet->dev->fd);
+	    // ogs_info("-----> IPv:%u, Sess IP: %u.%u.%u.%u", ip_h->ip_v, sess->ipv4->addr[0], sess->ipv4->addr[1], sess->ipv4->addr[2], sess->ipv4->addr[3]);
+	    // ogs_info("-----> Sess DNN: %u", sess->ipv4->subnet->dev->fd);
 	    src_addr = (void *)&ip_h->ip_src.s_addr;
             ogs_assert(src_addr);
-	    ogs_info("Hex dump at session object check:");
-	    ogs_log_hexdump(OGS_LOG_ERROR, pkbuf->data, pkbuf->len);
+	    // ogs_info("Hex dump at session object check:");
+	    // ogs_log_hexdump(OGS_LOG_ERROR, pkbuf->data, pkbuf->len);
             
 	
             /*
@@ -686,11 +748,11 @@ static void _gtpv1_u_recv_cb(short when, ogs_socket_t fd, void *data)
                     ip_h->ip_v, pkbuf->len);
             ogs_log_hexdump(OGS_LOG_ERROR, pkbuf->data, pkbuf->len);
             
-	    int tun_success = ogs_tun_write(tun_fd, pkbuf);
+	        int tun_success = ogs_tun_write(tun_fd, pkbuf);
 	    
-	    ogs_info("---------> tun write success? %u", tun_success == OGS_OK);
+	        ogs_info("---------> tun write success? %u", tun_success == OGS_OK);
 
-	    goto cleanup;
+	        goto cleanup;
         }
 
         if (far->dst_if == OGS_PFCP_INTERFACE_CORE) {

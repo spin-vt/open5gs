@@ -394,8 +394,8 @@ void ogs_pfcp_send_g_pdu(
         header_desc.pdcp_number = sendhdr->pdcp_number;
     }
 
-    ogs_info("RECVBUF before ogs_gtp2_send_user_plane is called");
-    ogs_log_hexdump(OGS_LOG_ERROR, sendbuf->data, sendbuf->len);
+    // ogs_info("RECVBUF before ogs_gtp2_send_user_plane is called");
+    // ogs_log_hexdump(OGS_LOG_ERROR, sendbuf->data, sendbuf->len);
 
     ogs_gtp2_send_user_plane(gnode, &header_desc, sendbuf);
 }
@@ -448,6 +448,7 @@ int ogs_pfcp_send_end_marker(ogs_pfcp_pdr_t *pdr)
 
 void ogs_pfcp_send_buffered_packet(ogs_pfcp_pdr_t *pdr)
 {
+    ogs_info("********* PFCP Send Buffered Packet called");
     ogs_pfcp_far_t *far = NULL;
     int i;
 
@@ -456,6 +457,7 @@ void ogs_pfcp_send_buffered_packet(ogs_pfcp_pdr_t *pdr)
 
     if (far && far->gnode) {
         if (far->apply_action & OGS_PFCP_APPLY_ACTION_FORW) {
+            ogs_info("********** PFCP send_buffered_packet -- num_of_buffered_packet  = %u", far->num_of_buffered_packet);
             for (i = 0; i < far->num_of_buffered_packet; i++) {
                 ogs_gtp2_header_desc_t sendhdr;
 

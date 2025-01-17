@@ -39,7 +39,7 @@ int ogs_gtp2_send_user_plane(
     gtp_hdesc.type = header_desc->type;
     gtp_hdesc.teid = header_desc->teid;
 
-    ogs_info("----------> [DL] ogs_gtp2_send_user_plane gtp_hdesc flags: %u, type: %u, teid: %u", header_desc->flags, header_desc->type, header_desc->teid);
+    // ogs_info("----------> [DL] ogs_gtp2_send_user_plane gtp_hdesc flags: %u, type: %u, teid: %u", header_desc->flags, header_desc->type, header_desc->teid);
 
     i = 0;
 
@@ -73,8 +73,8 @@ int ogs_gtp2_send_user_plane(
             header_desc->type,
             OGS_ADDR(&gnode->addr, buf), header_desc->teid);
 
-    ogs_info("RECVBUF before ogs_gtp_sendto is called");
-    ogs_log_hexdump(OGS_LOG_ERROR, pkbuf->data, pkbuf->len);
+    // ogs_info("RECVBUF before ogs_gtp_sendto is called");
+    // ogs_log_hexdump(OGS_LOG_ERROR, pkbuf->data, pkbuf->len);
 
     rv = ogs_gtp_sendto(gnode, pkbuf);
     if (rv != OGS_OK) {

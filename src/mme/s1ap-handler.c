@@ -3249,11 +3249,19 @@ void s1ap_handle_handover_request_ack(
     OGS_ASN_STORE_DATA(&mme_ue->container,
             Target_ToSource_TransparentContainer);
 
+    // ogs_info("********** No indirect tunnel being created during HO");
+    // r = s1ap_send_handover_command(source_ue);
+    // ogs_expect(r == OGS_OK);
+    // ogs_assert(r != OGS_ERROR);
+    
+
     if (mme_ue_have_indirect_tunnel(mme_ue) == true) {
+        ogs_info("********** Indirect tunnel being created -- request being sent from MME->SGW");
         ogs_assert(OGS_OK ==
             mme_gtp_send_create_indirect_data_forwarding_tunnel_request(
                 source_ue, mme_ue));
     } else {
+        ogs_info("********** No indirect tunnel being created during HO");
         r = s1ap_send_handover_command(source_ue);
         ogs_expect(r == OGS_OK);
         ogs_assert(r != OGS_ERROR);

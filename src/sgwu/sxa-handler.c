@@ -161,6 +161,7 @@ void sgwu_sxa_handle_session_modification_request(
         sgwu_sess_t *sess, ogs_pfcp_xact_t *xact, 
         ogs_pfcp_session_modification_request_t *req)
 {
+    ogs_info("********** PFCP Session Mod Request Received by SGWU");
     ogs_pfcp_pdr_t *pdr = NULL;
     ogs_pfcp_far_t *far = NULL;
     ogs_pfcp_pdr_t *created_pdr[OGS_MAX_NUM_OF_PDR];
@@ -303,6 +304,7 @@ void sgwu_sxa_handle_session_modification_request(
     /* Send Buffered Packet to gNB */
     ogs_list_for_each(&sess->pfcp.pdr_list, pdr) {
         if (pdr->src_if == OGS_PFCP_INTERFACE_CORE) { /* Downlink */
+            ogs_info("********** SGWU calling send_buffered_packet after receiving PFCP modification request");
             ogs_pfcp_send_buffered_packet(pdr);
         }
     }

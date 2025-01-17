@@ -230,6 +230,7 @@ bool ogs_pfcp_up_handle_pdr(
         ogs_gtp2_header_desc_t *recvhdr, ogs_pkbuf_t *sendbuf,
         ogs_pfcp_user_plane_report_t *report)
 {
+    // ogs_info("********** OGS PFCP UP HANDLE PDR is called");
     ogs_pfcp_far_t *far = NULL;
     bool buffering;
 
@@ -247,6 +248,7 @@ bool ogs_pfcp_up_handle_pdr(
 
     if (!far->gnode) {
         buffering = true;
+        ogs_info("********** buffering is set to true by up_handle_pdr");
 
     } else {
         if (far->apply_action & OGS_PFCP_APPLY_ACTION_FORW) {
@@ -269,8 +271,8 @@ bool ogs_pfcp_up_handle_pdr(
                     sendhdr.pdcp_number = recvhdr->pdcp_number;
                 }
             }
-	    ogs_info("RECVBUF before ogs_pfcp_send_g_pdu is called");
-	    ogs_log_hexdump(OGS_LOG_ERROR, sendbuf->data, sendbuf->len);
+	    // ogs_info("RECVBUF before ogs_pfcp_send_g_pdu is called");
+	    // ogs_log_hexdump(OGS_LOG_ERROR, sendbuf->data, sendbuf->len);
             ogs_pfcp_send_g_pdu(pdr, &sendhdr, sendbuf);
 
         } else if (far->apply_action & OGS_PFCP_APPLY_ACTION_BUFF) {
@@ -285,14 +287,19 @@ bool ogs_pfcp_up_handle_pdr(
 
     if (buffering == true) {
 
+        // Disabling buffering at the SGWC... messaging should remain the same.
+        // ogs_pkbuf_free(sendbuf);
+
         if (far->num_of_buffered_packet == 0) {
             /* Only the first time a packet is buffered,
              * it reports downlink notifications. */
             report->type.downlink_data_report = 1;
+            ogs_info("********** up_handle_pdr setting up buffer");
         }
 
         if (far->num_of_buffered_packet < OGS_MAX_NUM_OF_PACKET_BUFFER) {
             far->buffered_packet[far->num_of_buffered_packet++] = sendbuf;
+            ogs_info("********** up_handle_pdr buffers another packet");
         } else {
             ogs_pkbuf_free(sendbuf);
         }

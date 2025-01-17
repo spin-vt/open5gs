@@ -1377,6 +1377,8 @@ void sgwc_s11_handle_create_indirect_data_forwarding_tunnel_request(
         sgwc_ue_t *sgwc_ue, ogs_gtp_xact_t *s11_xact,
         ogs_pkbuf_t *gtpbuf, ogs_gtp2_message_t *message)
 {
+
+    ogs_info("********* Create Indirect Data Forwarding Tunnel Request received by SGWC");
     int rv, i;
 
     sgwc_sess_t *sess = NULL;
@@ -1562,6 +1564,9 @@ void sgwc_s11_handle_delete_indirect_data_forwarding_tunnel_request(
         sgwc_ue_t *sgwc_ue, ogs_gtp_xact_t *s11_xact,
         ogs_pkbuf_t *gtpbuf, ogs_gtp2_message_t *recv_message)
 {
+
+    ogs_info("********** Delete Indirect Data Forwarding Tunnel Request received by SGWC");
+
     sgwc_sess_t *sess = NULL;
     uint8_t cause_value = 0;
 
