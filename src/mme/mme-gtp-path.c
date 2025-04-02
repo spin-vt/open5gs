@@ -313,44 +313,8 @@ int mme_gtp_send_modify_bearer_request(
         enb_ue_t *enb_ue, mme_ue_t *mme_ue,
         int uli_presence, int modify_action)
 {
-    int rv;
-
-    ogs_gtp_xact_t *xact = NULL;
-    sgw_ue_t *sgw_ue = NULL;
-
-    ogs_gtp2_header_t h;
-    ogs_pkbuf_t *pkbuf = NULL;
-
-    ogs_assert(enb_ue);
-    ogs_assert(mme_ue);
-    sgw_ue = sgw_ue_find_by_id(mme_ue->sgw_ue_id);
-    ogs_assert(sgw_ue);
-
-    memset(&h, 0, sizeof(ogs_gtp2_header_t));
-    h.type = OGS_GTP2_MODIFY_BEARER_REQUEST_TYPE;
-    h.teid = sgw_ue->sgw_s11_teid;
-
-    pkbuf = mme_s11_build_modify_bearer_request(h.type, mme_ue, uli_presence);
-    if (!pkbuf) {
-        ogs_error("mme_s11_build_modify_bearer_request() failed");
-        return OGS_ERROR;
-    }
-
-    xact = ogs_gtp_xact_local_create(
-            sgw_ue->gnode, &h, pkbuf, timeout,
-            OGS_UINT_TO_POINTER(mme_ue->id));
-    if (!xact) {
-        ogs_error("ogs_gtp_xact_local_create() failed");
-        return OGS_ERROR;
-    }
-    xact->modify_action = modify_action;
-    xact->local_teid = mme_ue->gn.mme_gn_teid;
-    xact->enb_ue_id = enb_ue->id;
-
-    rv = ogs_gtp_xact_commit(xact);
-    ogs_expect(rv == OGS_OK);
-
-    return rv;
+    // skip any behavior and just return
+    return OGS_OK;
 }
 
 int mme_gtp_send_delete_session_request(
@@ -730,86 +694,15 @@ int mme_gtp_send_downlink_data_notification_ack(
 int mme_gtp_send_create_indirect_data_forwarding_tunnel_request(
         enb_ue_t *enb_ue, mme_ue_t *mme_ue)
 {
-    int rv;
-    ogs_gtp2_header_t h;
-    ogs_pkbuf_t *pkbuf = NULL;
-    ogs_gtp_xact_t *xact = NULL;
-    sgw_ue_t *sgw_ue = NULL;
-
-    ogs_assert(enb_ue);
-    ogs_assert(mme_ue);
-    sgw_ue = sgw_ue_find_by_id(mme_ue->sgw_ue_id);
-    ogs_assert(sgw_ue);
-
-    memset(&h, 0, sizeof(ogs_gtp2_header_t));
-    h.type = OGS_GTP2_CREATE_INDIRECT_DATA_FORWARDING_TUNNEL_REQUEST_TYPE;
-    h.teid = sgw_ue->sgw_s11_teid;
-
-    pkbuf = mme_s11_build_create_indirect_data_forwarding_tunnel_request(
-            h.type, mme_ue);
-    if (!pkbuf) {
-        ogs_error("mme_s11_build_create_indirect_data_forwarding_"
-                "tunnel_request() failed");
-        return OGS_ERROR;
-    }
-
-    xact = ogs_gtp_xact_local_create(
-            sgw_ue->gnode, &h, pkbuf, timeout,
-            OGS_UINT_TO_POINTER(mme_ue->id));
-    if (!xact) {
-        ogs_error("ogs_gtp_xact_local_create() failed");
-        return OGS_ERROR;
-    }
-    xact->local_teid = mme_ue->gn.mme_gn_teid;
-    xact->enb_ue_id = enb_ue->id;
-
-    rv = ogs_gtp_xact_commit(xact);
-    ogs_expect(rv == OGS_OK);
-
-    return rv;
+    // skip any behavior and just return
+    return OGS_OK;
 }
 
 int mme_gtp_send_delete_indirect_data_forwarding_tunnel_request(
         enb_ue_t *enb_ue, mme_ue_t *mme_ue, int action)
 {
-    int rv;
-    ogs_gtp2_header_t h;
-    ogs_pkbuf_t *pkbuf = NULL;
-    ogs_gtp_xact_t *xact = NULL;
-    sgw_ue_t *sgw_ue = NULL;
-
-    ogs_assert(enb_ue);
-    ogs_assert(action);
-    ogs_assert(mme_ue);
-    sgw_ue = sgw_ue_find_by_id(mme_ue->sgw_ue_id);
-    ogs_assert(sgw_ue);
-
-    memset(&h, 0, sizeof(ogs_gtp2_header_t));
-    h.type = OGS_GTP2_DELETE_INDIRECT_DATA_FORWARDING_TUNNEL_REQUEST_TYPE;
-    h.teid = sgw_ue->sgw_s11_teid;
-
-    pkbuf = ogs_pkbuf_alloc(NULL, OGS_TLV_MAX_HEADROOM);
-    if (!pkbuf) {
-        ogs_error("ogs_pkbuf_alloc() failed");
-        return OGS_ERROR;
-    }
-    ogs_pkbuf_reserve(pkbuf, OGS_TLV_MAX_HEADROOM);
-
-    xact = ogs_gtp_xact_local_create(
-            sgw_ue->gnode, &h, pkbuf, timeout,
-            OGS_UINT_TO_POINTER(mme_ue->id));
-    if (!xact) {
-        ogs_error("ogs_gtp_xact_local_create() failed");
-        return OGS_ERROR;
-    }
-    xact->delete_indirect_action = action;
-    xact->local_teid = mme_ue->gn.mme_gn_teid;
-    xact->enb_ue_id = enb_ue->id;
-
-    rv = ogs_gtp_xact_commit(xact);
-    ogs_expect(rv == OGS_OK);
-
-    return rv;
+    // skip any behavior and just return
+    return OGS_OK;
 }
 
 int mme_gtp_send_bearer_resource_command(
