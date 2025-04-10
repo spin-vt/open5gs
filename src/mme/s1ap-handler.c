@@ -1000,7 +1000,7 @@ void s1ap_handle_initial_context_setup_response(
     }
 
     if (E_RABSetupListCtxtSURes) {
-        // int uli_presence = 0;
+        int uli_presence = 0;
 
         ogs_list_init(&mme_ue->bearer_to_modify_list);
 
@@ -1065,7 +1065,7 @@ void s1ap_handle_initial_context_setup_response(
                 ogs_debug("    NAS_EPS Type[%d]", mme_ue->nas_eps.type);
                 if (mme_ue->nas_eps.type != MME_EPS_TYPE_ATTACH_REQUEST) {
                     ogs_debug("    ### ULI PRESENT ###");
-                    // uli_presence = 1;
+                    uli_presence = 1;
                 }
                 if (ogs_list_exists(
                             &mme_ue->bearer_to_modify_list,
@@ -1078,12 +1078,11 @@ void s1ap_handle_initial_context_setup_response(
             }
         }
 
-        ogs_info("Skipping send Modify Bearer Request...");
-        // if (ogs_list_count(&mme_ue->bearer_to_modify_list)) {
-        //     ogs_assert(OGS_OK ==
-        //         mme_gtp_send_modify_bearer_request(
-        //             enb_ue, mme_ue, uli_presence, 0));
-        // }
+        if (ogs_list_count(&mme_ue->bearer_to_modify_list)) {
+            ogs_assert(OGS_OK ==
+                mme_gtp_send_modify_bearer_request(
+                    enb_ue, mme_ue, uli_presence, 0));
+        }
     }
 
     if (MME_PAGING_ONGOING(mme_ue))
@@ -3250,10 +3249,15 @@ void s1ap_handle_handover_request_ack(
     OGS_ASN_STORE_DATA(&mme_ue->container,
             Target_ToSource_TransparentContainer);
 
-    // skip any direct tunneling creation
-    r = s1ap_send_handover_command(source_ue);
-    ogs_expect(r == OGS_OK);
-    ogs_assert(r != OGS_ERROR);
+    if (mme_ue_have_indirect_tunnel(mme_ue) == true) {
+        ogs_assert(OGS_OK ==
+            mme_gtp_send_create_indirect_data_forwarding_tunnel_request(
+                source_ue, mme_ue));
+    } else {
+        r = s1ap_send_handover_command(source_ue);
+        ogs_expect(r == OGS_OK);
+        ogs_assert(r != OGS_ERROR);
+    }
 }
 
 void s1ap_handle_handover_failure(mme_enb_t *enb, ogs_s1ap_message_t *message)

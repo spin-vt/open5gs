@@ -161,22 +161,8 @@ int esm_handle_pdn_connectivity_request(
             }
         }
 
-        // replace the call to send Create Session Request. Requires manually setting some session/bearer state.
-        ogs_info("Skipping send create session request and sending attaching accept immediately ...");
-        sess->paa.session_type = 1;
-        sess->paa.addr = 33565962;
-        default_bearer->ebi = 5;
-        default_bearer->qos.index = 9;
-        default_bearer->sgw_s1u_teid = 29849;
-        default_bearer->qos.arp.priority_level = 8;
-        default_bearer->qos.arp.pre_emption_capability = 1;
-        default_bearer->qos.arp.pre_emption_vulnerability = 1;
-        default_bearer->sgw_s1u_ip.addr = 100663423;
-        default_bearer->sgw_s1u_ip.ipv4 = 1;
-        default_bearer->sgw_s1u_ip.ipv6 = 0;
-        default_bearer->sgw_s1u_ip.len = 4;
-        nas_eps_send_attach_accept(mme_ue);
-
+        ogs_assert(OGS_OK ==
+            mme_gtp_send_create_session_request(enb_ue, sess, create_action));
     } else {
         ogs_error("No APN");
         r = nas_eps_send_pdn_connectivity_reject(
