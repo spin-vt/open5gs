@@ -28,6 +28,9 @@
 #include "s1ap-build.h"
 #include "s1ap-path.h"
 
+mme_enb_t *ENB_1;
+mme_enb_t *ENB_2;
+
 int s1ap_open(void)
 {
     ogs_socknode_t *node = NULL;
@@ -74,6 +77,37 @@ int s1ap_send_to_enb(mme_enb_t *enb, ogs_pkbuf_t *pkbuf, uint16_t stream_no)
     } else {
         return ogs_sctp_senddata(enb->sctp.sock, pkbuf, enb->sctp.addr);
     }
+}
+
+
+int s1ap_send_to_enb_ue_id(S1AP_ENB_UE_S1AP_ID_t enb_ue_id, ogs_pkbuf_t *pkbuf)
+{
+    // ogs_pool_id_t id;
+    int rv;
+    mme_enb_t *enb = NULL;
+
+    ogs_assert(pkbuf);
+
+    if (enb_ue_id == 1) {
+        enb = ENB_2; // enb_ue_id means packet is coming from enb1, (ID 0x19B) and needs to go to 0x19C = 412
+    } else if (enb_ue_id == 2) {
+        enb = ENB_1; // enb_ue_id means packet is coming from enb2, (ID 0x19C) and needs to go to 0x19B = 411
+    } else {
+        ogs_error("ERROR SENDING MME STATUS TRANSFER -- SHOULD NOT REACH THIS BRANCH!");
+        ogs_pkbuf_free(pkbuf);
+        return OGS_NOTFOUND;
+    }
+
+    if (!enb) {
+        ogs_error("[%d] eNB has already been removed", enb->enb_id);
+        ogs_pkbuf_free(pkbuf);
+        return OGS_NOTFOUND;
+    }
+
+    rv = s1ap_send_to_enb(enb, pkbuf, enb->ostream_id);
+    ogs_expect(rv == OGS_OK);
+
+    return rv;
 }
 
 int s1ap_send_to_enb_ue(enb_ue_t *enb_ue, ogs_pkbuf_t *pkbuf)
@@ -324,6 +358,13 @@ int s1ap_send_s1_setup_response(mme_enb_t *enb)
 
     rv = s1ap_send_to_enb(enb, s1ap_buffer, S1AP_NON_UE_SIGNALLING);
     ogs_expect(rv == OGS_OK);
+    if (!ENB_1) {
+        ENB_1 = enb;
+        ogs_info("Saved new ENB_1");
+    } else if (!ENB_2) {
+        ENB_2 = enb;
+        ogs_info("Saved new ENB_2");
+    }
 
     return rv;
 }
@@ -481,11 +522,13 @@ int s1ap_send_ue_context_release_command(
         return OGS_ERROR;
     }
 
-    rv = s1ap_delayed_send_to_enb_ue(enb_ue, s1apbuf, duration);
+    ogs_info("------ REMOVING TIMER AND DELAYED SEND.....");
+    rv = s1ap_delayed_send_to_enb_ue(enb_ue, s1apbuf, 0);
+    // rv = s1ap_delayed_send_to_enb_ue(enb_ue, s1apbuf, duration);
     ogs_expect(rv == OGS_OK);
 
-    ogs_timer_start(enb_ue->t_s1_holding,
-            mme_timer_cfg(MME_TIMER_S1_HOLDING)->duration);
+    // ogs_timer_start(enb_ue->t_s1_holding,
+    //        mme_timer_cfg(MME_TIMER_S1_HOLDING)->duration);
 
     return rv;
 }
