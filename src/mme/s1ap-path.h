@@ -39,6 +39,7 @@ void s1ap_recv_upcall(short when, ogs_socket_t fd, void *data);
 
 int s1ap_send_to_enb(
         mme_enb_t *enb, ogs_pkbuf_t *pkb, uint16_t stream_no);
+int s1ap_send_to_enb_ue_id(S1AP_ENB_UE_S1AP_ID_t enb_ue_id, ogs_pkbuf_t *pkbuf);
 int s1ap_send_to_enb_ue(enb_ue_t *enb_ue, ogs_pkbuf_t *pkbuf);
 int s1ap_delayed_send_to_enb_ue(enb_ue_t *enb_ue,
         ogs_pkbuf_t *pkbuf, ogs_time_t duration);
@@ -89,7 +90,7 @@ int s1ap_send_handover_request(
 int s1ap_send_handover_cancel_ack(enb_ue_t *source_ue);
 
 int s1ap_send_mme_status_transfer(
-        enb_ue_t *target_ue,
+        S1AP_ENB_UE_S1AP_ID_t enb_ue_s1ap_id,
         S1AP_ENB_StatusTransfer_TransparentContainer_t
             *enb_statustransfer_transparentContainer);
 int s1ap_send_error_indication(

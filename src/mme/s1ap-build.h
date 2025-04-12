@@ -81,7 +81,7 @@ ogs_pkbuf_t *s1ap_build_handover_cancel_ack(
     enb_ue_t *source_ue);
 
 ogs_pkbuf_t *s1ap_build_mme_status_transfer(
-    enb_ue_t *target_ue,
+    S1AP_ENB_UE_S1AP_ID_t enb_ue_s1ap_id,
     S1AP_ENB_StatusTransfer_TransparentContainer_t
         *enb_statustransfer_transparentContainer);
 

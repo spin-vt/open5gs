@@ -2496,7 +2496,7 @@ ogs_pkbuf_t *s1ap_build_handover_cancel_ack(enb_ue_t *source_ue)
 }
 
 ogs_pkbuf_t *s1ap_build_mme_status_transfer(
-        enb_ue_t *target_ue,
+        S1AP_ENB_UE_S1AP_ID_t enb_ue_s1ap_id,
         S1AP_ENB_StatusTransfer_TransparentContainer_t
             *enb_statustransfer_transparentContainer)
 {
@@ -2512,7 +2512,7 @@ ogs_pkbuf_t *s1ap_build_mme_status_transfer(
     S1AP_ENB_StatusTransfer_TransparentContainer_t
         *ENB_StatusTransfer_TransparentContainer = NULL;
 
-    ogs_assert(target_ue);
+    // ogs_assert(target_ue);
     ogs_assert(enb_statustransfer_transparentContainer);
 
     ogs_debug("MMEStatusTransfer");
@@ -2558,11 +2558,20 @@ ogs_pkbuf_t *s1ap_build_mme_status_transfer(
     ENB_StatusTransfer_TransparentContainer =
         &ie->value.choice.ENB_StatusTransfer_TransparentContainer;
 
-    *MME_UE_S1AP_ID = target_ue->mme_ue_s1ap_id;
-    *ENB_UE_S1AP_ID = target_ue->enb_ue_s1ap_id;
+    *MME_UE_S1AP_ID = 99; // random value, shouldn't matter
+    if (enb_ue_s1ap_id == 1) {
+        enb_ue_s1ap_id = 2;
+    } else if (enb_ue_s1ap_id == 2) {
+        enb_ue_s1ap_id = 1;
+    } else {
+        ogs_error("ENB UE ID is not 1 or 2 -- FAIL");
+        ogs_asn_free(&asn_DEF_S1AP_S1AP_PDU, &pdu);
+        return NULL;
+    }
+    *ENB_UE_S1AP_ID = enb_ue_s1ap_id;
 
-    ogs_debug("    Target : ENB_UE_S1AP_ID[%d] MME_UE_S1AP_ID[%d]",
-            target_ue->enb_ue_s1ap_id, target_ue->mme_ue_s1ap_id);
+    // ogs_debug("    Target : ENB_UE_S1AP_ID[%d] MME_UE_S1AP_ID[%d]",
+    //         target_ue->enb_ue_s1ap_id, target_ue->mme_ue_s1ap_id);
 
     rv = ogs_asn_copy_ie(
             &asn_DEF_S1AP_ENB_StatusTransfer_TransparentContainer,

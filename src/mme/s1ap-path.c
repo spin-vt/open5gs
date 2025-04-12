@@ -157,6 +157,7 @@ int s1ap_delayed_send_to_enb_ue(
 
         return OGS_OK;
     } else {
+	ogs_info("---------- delayed_send else branch");
         int rv = s1ap_send_to_enb_ue(enb_ue, pkbuf);
         ogs_expect(rv == OGS_OK);
 
@@ -348,7 +349,7 @@ int s1ap_send_s1_setup_response(mme_enb_t *enb)
 
     ogs_assert(enb);
 
-    ogs_debug("S1-Setup response");
+    ogs_info("S1-Setup response");
 
     s1ap_buffer = s1ap_build_setup_rsp();
     if (!s1ap_buffer) {
@@ -869,7 +870,7 @@ int s1ap_send_handover_request(
 }
 
 int s1ap_send_mme_status_transfer(
-        enb_ue_t *target_ue,
+        S1AP_ENB_UE_S1AP_ID_t enb_ue_s1ap_id,
         S1AP_ENB_StatusTransfer_TransparentContainer_t
             *enb_statustransfer_transparentContainer)
 {
@@ -878,19 +879,19 @@ int s1ap_send_mme_status_transfer(
 
     ogs_info("MMEStatusTransfer");
 
-    if (!target_ue) {
-        ogs_error("S1 context has already been removed");
-        return OGS_NOTFOUND;
-    }
+    // if (!target_ue) {
+    //     ogs_error("S1 context has already been removed");
+    //     return OGS_NOTFOUND;
+    // }
 
-    s1apbuf = s1ap_build_mme_status_transfer(target_ue,
+    s1apbuf = s1ap_build_mme_status_transfer(enb_ue_s1ap_id,
             enb_statustransfer_transparentContainer);
     if (!s1apbuf) {
         ogs_error("s1ap_build_mme_status_transfer() failed");
         return OGS_ERROR;
     }
 
-    rv = s1ap_send_to_enb_ue(target_ue, s1apbuf);
+    rv = s1ap_send_to_enb_ue_id(enb_ue_s1ap_id, s1apbuf);
     ogs_expect(rv == OGS_OK);
 
     return rv;
