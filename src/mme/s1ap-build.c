@@ -2173,16 +2173,18 @@ ogs_pkbuf_t *s1ap_build_handover_command_hop(S1AP_ENB_UE_S1AP_ID_t enb_ue_id,
     HandoverType = &ie->value.choice.HandoverType;
 
     *MME_UE_S1AP_ID = 99;
+
+    int enb_ue_s1ap_id= 0;
     if (enb_ue_id == 1) {
-        enb_ue_id = 2;
+        enb_ue_s1ap_id = 2;
     } else if (enb_ue_id == 2) {
-        enb_ue_id = 1;
+        enb_ue_s1ap_id = 1;
     } else {
         ogs_error("ENB UE ID is not 1 or 2 -- FAIL");
         ogs_asn_free(&asn_DEF_S1AP_S1AP_PDU, &pdu);
         return NULL;
     }
-    *ENB_UE_S1AP_ID = enb_ue_id;
+    *ENB_UE_S1AP_ID = enb_ue_s1ap_id;
     *HandoverType = 0;
 
     ie = CALLOC(1, sizeof(S1AP_HandoverCommandIEs_t));

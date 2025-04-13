@@ -3120,6 +3120,7 @@ void s1ap_handle_handover_request_ack(
 
     OGS_ASN_STORE_DATA(container, Target_ToSource_TransparentContainer);
 
+    ogs_info(" --- Sending handover command hop from handler");
     r = s1ap_send_handover_command_hop(enb_ue_s1ap_id, container);
     free(container);
     ogs_expect(r == OGS_OK);

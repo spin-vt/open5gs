@@ -731,12 +731,13 @@ int s1ap_send_handover_command_hop(S1AP_ENB_UE_S1AP_ID_t enb_ue_id,
 
     ogs_debug("HOP HandoverCommand");
 
+    ogs_info("--- building handover command hop from send_ho_com_hop");
     s1apbuf = s1ap_build_handover_command_hop(enb_ue_id, container);
     if (!s1apbuf) {
         ogs_error("s1ap_build_handover_command() failed");
         return OGS_ERROR;
     }
-
+    ogs_info("--- sending to enb using UE ID from send_ho_com_hop");
     rv = s1ap_send_to_enb_ue_id(enb_ue_id, s1apbuf);
     ogs_expect(rv == OGS_OK);
 
