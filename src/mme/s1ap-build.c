@@ -1038,6 +1038,69 @@ ogs_pkbuf_t *s1ap_build_ue_context_release_command(
     return ogs_s1ap_encode(&pdu);
 }
 
+ogs_pkbuf_t *s1ap_build_ue_context_release_command_hop(
+    S1AP_ENB_UE_S1AP_ID_t enb_ue_id, S1AP_Cause_PR group, long cause)
+{
+    S1AP_S1AP_PDU_t pdu;
+    S1AP_InitiatingMessage_t *initiatingMessage = NULL;
+    S1AP_UEContextReleaseCommand_t *UEContextReleaseCommand = NULL;
+
+    S1AP_UEContextReleaseCommand_IEs_t *ie = NULL;
+    S1AP_UE_S1AP_IDs_t *UE_S1AP_IDs = NULL;
+    S1AP_Cause_t *Cause = NULL;
+
+    ogs_debug("UEContextReleaseCommand");
+
+    memset(&pdu, 0, sizeof (S1AP_S1AP_PDU_t));
+    pdu.present = S1AP_S1AP_PDU_PR_initiatingMessage;
+    pdu.choice.initiatingMessage = CALLOC(1, sizeof(S1AP_InitiatingMessage_t));
+
+    initiatingMessage = pdu.choice.initiatingMessage;
+    initiatingMessage->procedureCode = S1AP_ProcedureCode_id_UEContextRelease;
+    initiatingMessage->criticality = S1AP_Criticality_reject;
+    initiatingMessage->value.present =
+        S1AP_InitiatingMessage__value_PR_UEContextReleaseCommand;
+
+    UEContextReleaseCommand =
+        &initiatingMessage->value.choice.UEContextReleaseCommand;
+
+    ie = CALLOC(1, sizeof(S1AP_UEContextReleaseCommand_IEs_t));
+    ASN_SEQUENCE_ADD(&UEContextReleaseCommand->protocolIEs, ie);
+
+    ie->id = S1AP_ProtocolIE_ID_id_UE_S1AP_IDs;
+    ie->criticality = S1AP_Criticality_reject;
+    ie->value.present = S1AP_UEContextReleaseCommand_IEs__value_PR_UE_S1AP_IDs;
+
+    UE_S1AP_IDs = &ie->value.choice.UE_S1AP_IDs;
+
+    ie = CALLOC(1, sizeof(S1AP_UEContextReleaseCommand_IEs_t));
+    ASN_SEQUENCE_ADD(&UEContextReleaseCommand->protocolIEs, ie);
+
+    ie->id = S1AP_ProtocolIE_ID_id_Cause;
+    ie->criticality = S1AP_Criticality_ignore;
+    ie->value.present = S1AP_UEContextReleaseCommand_IEs__value_PR_Cause;
+
+    Cause = &ie->value.choice.Cause;
+
+    UE_S1AP_IDs->present = S1AP_UE_S1AP_IDs_PR_uE_S1AP_ID_pair;
+    UE_S1AP_IDs->choice.uE_S1AP_ID_pair =
+        CALLOC(1, sizeof(S1AP_UE_S1AP_ID_pair_t));
+    UE_S1AP_IDs->choice.uE_S1AP_ID_pair->mME_UE_S1AP_ID = 99;
+    
+    uint32_t enb_ue_s1ap_id = 0;
+    if (enb_ue_id == 1) {
+        enb_ue_s1ap_id = 2;
+    } else if (enb_ue_id == 2) {
+        enb_ue_s1ap_id = 1;
+    }
+    UE_S1AP_IDs->choice.uE_S1AP_ID_pair->eNB_UE_S1AP_ID = enb_ue_s1ap_id;
+
+    Cause->present = group;
+    Cause->choice.radioNetwork = cause;
+
+    return ogs_s1ap_encode(&pdu);
+}
+
 
 ogs_pkbuf_t *s1ap_build_e_rab_setup_request(
             mme_bearer_t *bearer, ogs_pkbuf_t *esmbuf)

@@ -3488,12 +3488,6 @@ void s1ap_handle_handover_notification(
     S1AP_CellIdentity_t *cell_ID = NULL;
     S1AP_TAC_t *tAC = NULL;
 
-    enb_ue_t *source_ue = NULL;
-    enb_ue_t *target_ue = NULL;
-    mme_ue_t *mme_ue = NULL;
-    mme_sess_t *sess = NULL;
-    mme_bearer_t *bearer = NULL;
-
     ogs_assert(enb);
     ogs_assert(enb->sctp.sock);
 
@@ -3553,18 +3547,6 @@ void s1ap_handle_handover_notification(
         return;
     }
 
-    target_ue = enb_ue_find_by_mme_ue_s1ap_id(*MME_UE_S1AP_ID);
-    if (!target_ue) {
-        ogs_error("No eNB UE Context : MME_UE_S1AP_ID[%lld]",
-                (long long)*MME_UE_S1AP_ID);
-        r = s1ap_send_error_indication(enb, MME_UE_S1AP_ID, NULL,
-                S1AP_Cause_PR_radioNetwork,
-                S1AP_CauseRadioNetwork_unknown_mme_ue_s1ap_id);
-        ogs_expect(r == OGS_OK);
-        ogs_assert(r != OGS_ERROR);
-        return;
-    }
-
     if (!EUTRAN_CGI) {
         ogs_error("No EUTRAN_CGI");
         r = s1ap_send_error_indication(enb, MME_UE_S1AP_ID, ENB_UE_S1AP_ID,
@@ -3583,97 +3565,24 @@ void s1ap_handle_handover_notification(
         return;
     }
 
-    source_ue = enb_ue_find_by_id(target_ue->source_ue_id);
-    if (!source_ue) {
-        ogs_error("No Source UE");
-        r = s1ap_send_error_indication(enb, MME_UE_S1AP_ID, ENB_UE_S1AP_ID,
-                S1AP_Cause_PR_protocol, S1AP_CauseProtocol_semantic_error);
-        ogs_expect(r == OGS_OK);
-        ogs_assert(r != OGS_ERROR);
-        return;
-    }
-
-    mme_ue = mme_ue_find_by_id(source_ue->mme_ue_id);
-    if (!mme_ue) {
-        ogs_error("No UE(mme-ue) context");
-        return;
-    }
-
-    ogs_debug("    Source : ENB_UE_S1AP_ID[%d] MME_UE_S1AP_ID[%d]",
-            source_ue->enb_ue_s1ap_id, source_ue->mme_ue_s1ap_id);
-    ogs_debug("    Target : ENB_UE_S1AP_ID[%d] MME_UE_S1AP_ID[%d]",
-            target_ue->enb_ue_s1ap_id, target_ue->mme_ue_s1ap_id);
-
-    enb_ue_associate_mme_ue(target_ue, mme_ue);
-    ogs_debug("Mobile Reachable timer stopped for IMSI[%s]", mme_ue->imsi_bcd);
-    CLEAR_MME_UE_TIMER(mme_ue->t_mobile_reachable);
 
     pLMNidentity = &TAI->pLMNidentity;
     ogs_assert(pLMNidentity && pLMNidentity->size == sizeof(ogs_plmn_id_t));
     tAC = &TAI->tAC;
     ogs_assert(tAC && tAC->size == sizeof(uint16_t));
-    memcpy(&target_ue->saved.tai.plmn_id, pLMNidentity->buf,
-            sizeof(target_ue->saved.tai.plmn_id));
-    memcpy(&target_ue->saved.tai.tac,
-            tAC->buf, sizeof(target_ue->saved.tai.tac));
-    target_ue->saved.tai.tac = be16toh(target_ue->saved.tai.tac);
 
     pLMNidentity = &EUTRAN_CGI->pLMNidentity;
     ogs_assert(pLMNidentity && pLMNidentity->size == sizeof(ogs_plmn_id_t));
     cell_ID = &EUTRAN_CGI->cell_ID;
     ogs_assert(cell_ID);
-    memcpy(&target_ue->saved.e_cgi.plmn_id, pLMNidentity->buf,
-            sizeof(target_ue->saved.e_cgi.plmn_id));
-    memcpy(&target_ue->saved.e_cgi.cell_id, cell_ID->buf,
-            sizeof(target_ue->saved.e_cgi.cell_id));
-    target_ue->saved.e_cgi.cell_id =
-        (be32toh(target_ue->saved.e_cgi.cell_id) >> 4);
 
-    ogs_debug("    OLD TAI[PLMN_ID:%06x,TAC:%d]",
-            ogs_plmn_id_hexdump(&mme_ue->tai.plmn_id),
-            mme_ue->tai.tac);
-    ogs_debug("    OLD E_CGI[PLMN_ID:%06x,CELL_ID:0x%x]",
-            ogs_plmn_id_hexdump(&mme_ue->e_cgi.plmn_id),
-            mme_ue->e_cgi.cell_id);
-    ogs_debug("    TAI[PLMN_ID:%06x,TAC:%d]",
-            ogs_plmn_id_hexdump(&target_ue->saved.tai.plmn_id),
-            target_ue->saved.tai.tac);
-    ogs_debug("    E_CGI[PLMN_ID:%06x,CELL_ID:0x%x]",
-            ogs_plmn_id_hexdump(&target_ue->saved.e_cgi.plmn_id),
-            target_ue->saved.e_cgi.cell_id);
-
-    /* Copy Stream-No/TAI/ECGI from enb_ue */
-    mme_ue->enb_ostream_id = target_ue->enb_ostream_id;
-    memcpy(&mme_ue->tai, &target_ue->saved.tai, sizeof(ogs_eps_tai_t));
-    memcpy(&mme_ue->e_cgi, &target_ue->saved.e_cgi, sizeof(ogs_e_cgi_t));
-    mme_ue->ue_location_timestamp = ogs_time_now();
-
-    r = s1ap_send_ue_context_release_command(source_ue,
+    r = s1ap_send_ue_context_release_command_hop(*ENB_UE_S1AP_ID,
             S1AP_Cause_PR_radioNetwork,
             S1AP_CauseRadioNetwork_successful_handover,
             S1AP_UE_CTX_REL_S1_HANDOVER_COMPLETE,
             ogs_local_conf()->time.handover.duration);
     ogs_expect(r == OGS_OK);
     ogs_assert(r != OGS_ERROR);
-
-    ogs_list_init(&mme_ue->bearer_to_modify_list);
-
-    ogs_list_for_each(&mme_ue->sess_list, sess) {
-        ogs_list_for_each(&sess->bearer_list, bearer) {
-            bearer->enb_s1u_teid = bearer->target_s1u_teid;
-            memcpy(&bearer->enb_s1u_ip, &bearer->target_s1u_ip,
-                    sizeof(ogs_ip_t));
-
-            ogs_list_add(
-                    &mme_ue->bearer_to_modify_list, &bearer->to_modify_node);
-
-        }
-    }
-
-    if (ogs_list_count(&mme_ue->bearer_to_modify_list)) {
-        ogs_assert(OGS_OK == mme_gtp_send_modify_bearer_request(
-                    target_ue, mme_ue, 1, 0));
-    }
 }
 
 void s1ap_handle_s1_reset(

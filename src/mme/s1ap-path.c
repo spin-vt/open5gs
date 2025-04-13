@@ -534,6 +534,32 @@ int s1ap_send_ue_context_release_command(
     return rv;
 }
 
+int s1ap_send_ue_context_release_command_hop(
+    S1AP_ENB_UE_S1AP_ID_t enb_ue_id, S1AP_Cause_PR group, long cause,
+    uint8_t action, ogs_time_t duration)
+{
+    int rv;
+    ogs_pkbuf_t *s1apbuf = NULL;
+
+    ogs_debug("UEContextReleaseCommand");
+
+    s1apbuf = s1ap_build_ue_context_release_command_hop(enb_ue_id, group, cause);
+    if (!s1apbuf) {
+        ogs_error("s1ap_build_ue_context_release_command() failed");
+        return OGS_ERROR;
+    }
+
+    ogs_info("------ REMOVING TIMER AND DELAYED SEND.....");
+    rv = s1ap_send_to_enb_ue_id(enb_ue_id, s1apbuf);
+    // rv = s1ap_delayed_send_to_enb_ue(enb_ue, s1apbuf, duration);
+    ogs_expect(rv == OGS_OK);
+
+    // ogs_timer_start(enb_ue->t_s1_holding,
+    //        mme_timer_cfg(MME_TIMER_S1_HOLDING)->duration);
+
+    return rv;
+}
+
 int s1ap_send_paging(mme_ue_t *mme_ue, S1AP_CNDomain_t cn_domain)
 {
     ogs_pkbuf_t *s1apbuf = NULL;
