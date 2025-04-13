@@ -3047,7 +3047,7 @@ void s1ap_handle_handover_request_ack(
         &successfulOutcome->value.choice.HandoverRequestAcknowledge;
     ogs_assert(HandoverRequestAcknowledge);
 
-    ogs_debug("HandoverRequestAcknowledge");
+    ogs_info("HandoverRequestAcknowledge");
     for (i = 0; i < HandoverRequestAcknowledge->protocolIEs.list.count; i++) {
         ie = HandoverRequestAcknowledge->protocolIEs.list.array[i];
         switch (ie->id) {
@@ -3118,10 +3118,8 @@ void s1ap_handle_handover_request_ack(
         return;
     }
 
-    OGS_ASN_STORE_DATA(container, Target_ToSource_TransparentContainer);
-
     ogs_info(" --- Sending handover command hop from handler");
-    r = s1ap_send_handover_command_hop(enb_ue_s1ap_id, container);
+    r = s1ap_send_handover_command_hop(enb_ue_s1ap_id, Target_ToSource_TransparentContainer);
     free(container);
     ogs_expect(r == OGS_OK);
     ogs_assert(r != OGS_ERROR);
