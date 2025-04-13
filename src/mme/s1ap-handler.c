@@ -3020,7 +3020,8 @@ void s1ap_handle_handover_required(mme_enb_t *enb, ogs_s1ap_message_t *message)
 void s1ap_handle_handover_request_ack(
         mme_enb_t *enb, ogs_s1ap_message_t *message)
 {
-    int i, r, rv;
+    int i, r;
+    // int i, r, rv;
     char buf[OGS_ADDRSTRLEN];
 
     S1AP_SuccessfulOutcome_t *successfulOutcome = NULL;
@@ -3029,13 +3030,12 @@ void s1ap_handle_handover_request_ack(
     S1AP_HandoverRequestAcknowledgeIEs_t *ie = NULL;
     S1AP_MME_UE_S1AP_ID_t *MME_UE_S1AP_ID = NULL;
     S1AP_ENB_UE_S1AP_ID_t *ENB_UE_S1AP_ID = NULL;
+    S1AP_ENB_UE_S1AP_ID_t enb_ue_s1ap_id;
     S1AP_E_RABAdmittedList_t *E_RABAdmittedList = NULL;
     S1AP_Target_ToSource_TransparentContainer_t
         *Target_ToSource_TransparentContainer = NULL;
+    OCTET_STRING_t *container = malloc(sizeof *container);
 
-    enb_ue_t *source_ue = NULL;
-    enb_ue_t *target_ue = NULL;
-    mme_ue_t *mme_ue = NULL;
 
     ogs_assert(enb);
     ogs_assert(enb->sctp.sock);
@@ -3056,6 +3056,7 @@ void s1ap_handle_handover_request_ack(
             break;
         case S1AP_ProtocolIE_ID_id_eNB_UE_S1AP_ID:
             ENB_UE_S1AP_ID = &ie->value.choice.ENB_UE_S1AP_ID;
+            enb_ue_s1ap_id = ie->value.choice.ENB_UE_S1AP_ID;
             break;
         case S1AP_ProtocolIE_ID_id_E_RABAdmittedList:
             E_RABAdmittedList = &ie->value.choice.E_RABAdmittedList;
@@ -3099,18 +3100,6 @@ void s1ap_handle_handover_request_ack(
         return;
     }
 
-    target_ue = enb_ue_find_by_mme_ue_s1ap_id(*MME_UE_S1AP_ID);
-    if (!target_ue) {
-        ogs_error("No eNB UE Context : MME_UE_S1AP_ID[%lld]",
-                (long long)*MME_UE_S1AP_ID);
-        r = s1ap_send_error_indication(enb, MME_UE_S1AP_ID, NULL,
-                S1AP_Cause_PR_radioNetwork,
-                S1AP_CauseRadioNetwork_unknown_mme_ue_s1ap_id);
-        ogs_expect(r == OGS_OK);
-        ogs_assert(r != OGS_ERROR);
-        return;
-    }
-
     if (!E_RABAdmittedList) {
         ogs_error("No E_RABAdmittedList");
         r = s1ap_send_error_indication(enb, MME_UE_S1AP_ID, ENB_UE_S1AP_ID,
@@ -3129,135 +3118,12 @@ void s1ap_handle_handover_request_ack(
         return;
     }
 
-    source_ue = enb_ue_find_by_id(target_ue->source_ue_id);
-    if (!source_ue) {
-        ogs_error("No Source UE");
-        r = s1ap_send_error_indication(enb, MME_UE_S1AP_ID, ENB_UE_S1AP_ID,
-                S1AP_Cause_PR_protocol, S1AP_CauseProtocol_semantic_error);
-        ogs_expect(r == OGS_OK);
-        ogs_assert(r != OGS_ERROR);
-        return;
-    }
+    OGS_ASN_STORE_DATA(container, Target_ToSource_TransparentContainer);
 
-    mme_ue = mme_ue_find_by_id(source_ue->mme_ue_id);
-    if (!mme_ue) {
-        ogs_error("No UE(mme-ue) context");
-        return;
-    }
-
-    ogs_debug("    Source : ENB_UE_S1AP_ID[%d] MME_UE_S1AP_ID[%d]",
-            source_ue->enb_ue_s1ap_id, source_ue->mme_ue_s1ap_id);
-    ogs_debug("    Target : ENB_UE_S1AP_ID[%d] MME_UE_S1AP_ID[%d]",
-            target_ue->enb_ue_s1ap_id, target_ue->mme_ue_s1ap_id);
-
-    target_ue->enb_ue_s1ap_id = *ENB_UE_S1AP_ID;
-
-    for (i = 0; i < E_RABAdmittedList->list.count; i++) {
-        S1AP_E_RABAdmittedItemIEs_t *item = NULL;
-        S1AP_E_RABAdmittedItem_t *e_rab = NULL;
-
-        mme_bearer_t *bearer = NULL;
-
-        item = (S1AP_E_RABAdmittedItemIEs_t *)E_RABAdmittedList->list.array[i];
-        if (!item) {
-            ogs_error("No S1AP_E_RABAdmittedItemIEs_t");
-            r = s1ap_send_error_indication2(mme_ue,
-                S1AP_Cause_PR_protocol, S1AP_CauseProtocol_semantic_error);
-            ogs_expect(r == OGS_OK);
-            ogs_assert(r != OGS_ERROR);
-            return;
-        }
-
-        e_rab = &item->value.choice.E_RABAdmittedItem;
-        if (!e_rab) {
-            ogs_error("No E_RABAdmittedItem");
-            r = s1ap_send_error_indication2(mme_ue,
-                S1AP_Cause_PR_protocol, S1AP_CauseProtocol_semantic_error);
-            ogs_expect(r == OGS_OK);
-            ogs_assert(r != OGS_ERROR);
-            return;
-        }
-
-        bearer = mme_bearer_find_by_ue_ebi(mme_ue, e_rab->e_RAB_ID);
-        if (!bearer) {
-            ogs_error("No Bearer [%d]", (int)e_rab->e_RAB_ID);
-            r = s1ap_send_error_indication2(mme_ue,
-                    S1AP_Cause_PR_radioNetwork,
-                    S1AP_CauseRadioNetwork_unknown_E_RAB_ID);
-            ogs_expect(r == OGS_OK);
-            ogs_assert(r != OGS_ERROR);
-            return;
-        }
-
-        memcpy(&bearer->target_s1u_teid, e_rab->gTP_TEID.buf,
-                sizeof(bearer->target_s1u_teid));
-        bearer->target_s1u_teid = be32toh(bearer->target_s1u_teid);
-        rv = ogs_asn_BIT_STRING_to_ip(
-                &e_rab->transportLayerAddress, &bearer->target_s1u_ip);
-        if (rv != OGS_OK) {
-            ogs_error("No transportLayerAddress [%d]",
-                    (int)e_rab->e_RAB_ID);
-            r = s1ap_send_error_indication2(mme_ue,
-                    S1AP_Cause_PR_protocol,
-                    S1AP_CauseProtocol_abstract_syntax_error_falsely_constructed_message);
-            ogs_expect(r == OGS_OK);
-            ogs_assert(r != OGS_ERROR);
-            return;
-        }
-
-        if (e_rab->dL_transportLayerAddress && e_rab->dL_gTP_TEID) {
-            ogs_assert(e_rab->dL_gTP_TEID->buf);
-            ogs_assert(e_rab->dL_transportLayerAddress->buf);
-            memcpy(&bearer->enb_dl_teid, e_rab->dL_gTP_TEID->buf,
-                    sizeof(bearer->enb_dl_teid));
-            bearer->enb_dl_teid = be32toh(bearer->enb_dl_teid);
-            rv = ogs_asn_BIT_STRING_to_ip(
-                    e_rab->dL_transportLayerAddress, &bearer->enb_dl_ip);
-            if (rv != OGS_OK) {
-                ogs_error("No dL_transportLayerAddress [%d]",
-                        (int)e_rab->e_RAB_ID);
-                r = s1ap_send_error_indication2(mme_ue,
-                        S1AP_Cause_PR_protocol,
-                        S1AP_CauseProtocol_abstract_syntax_error_falsely_constructed_message);
-                ogs_expect(r == OGS_OK);
-                ogs_assert(r != OGS_ERROR);
-                return;
-            }
-        }
-
-        if (e_rab->uL_TransportLayerAddress && e_rab->uL_GTP_TEID) {
-            ogs_assert(e_rab->uL_GTP_TEID->buf);
-            ogs_assert(e_rab->uL_TransportLayerAddress->buf);
-            memcpy(&bearer->enb_ul_teid, e_rab->uL_GTP_TEID->buf,
-                    sizeof(bearer->enb_ul_teid));
-            bearer->enb_ul_teid = be32toh(bearer->enb_ul_teid);
-            rv = ogs_asn_BIT_STRING_to_ip(
-                    e_rab->uL_TransportLayerAddress, &bearer->enb_ul_ip);
-            if (rv != OGS_OK) {
-                ogs_error("No uL_transportLayerAddress [%d]",
-                        (int)e_rab->e_RAB_ID);
-                r = s1ap_send_error_indication2(mme_ue,
-                        S1AP_Cause_PR_protocol,
-                        S1AP_CauseProtocol_abstract_syntax_error_falsely_constructed_message);
-                ogs_expect(r == OGS_OK);
-                ogs_assert(r != OGS_ERROR);
-                return;
-            }
-        }
-    }
-
-    OGS_ASN_STORE_DATA(&mme_ue->container,
-            Target_ToSource_TransparentContainer);
-
-    if (mme_ue_have_indirect_tunnel(mme_ue) == true) {
-        ogs_assert(OGS_OK ==
-            mme_gtp_send_create_indirect_data_forwarding_tunnel_request(
-                source_ue, mme_ue));
-    } else {
-        r = s1ap_send_handover_command(source_ue);
-        ogs_expect(r == OGS_OK);
-        ogs_assert(r != OGS_ERROR);
-    }
+    r = s1ap_send_handover_command_hop(enb_ue_s1ap_id, container);
+    free(container);
+    ogs_expect(r == OGS_OK);
+    ogs_assert(r != OGS_ERROR);
 }
 
 void s1ap_handle_handover_failure(mme_enb_t *enb, ogs_s1ap_message_t *message)

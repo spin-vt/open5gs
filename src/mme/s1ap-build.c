@@ -2111,6 +2111,97 @@ ogs_pkbuf_t *s1ap_build_handover_command(enb_ue_t *source_ue)
     return ogs_s1ap_encode(&pdu);
 }
 
+ogs_pkbuf_t *s1ap_build_handover_command_hop(S1AP_ENB_UE_S1AP_ID_t enb_ue_id,
+        S1AP_Target_ToSource_TransparentContainer_t *container)
+{
+    // int rv;
+
+    S1AP_S1AP_PDU_t pdu;
+    S1AP_SuccessfulOutcome_t *successfulOutcome = NULL;
+    S1AP_HandoverCommand_t *HandoverCommand = NULL;
+
+    S1AP_HandoverCommandIEs_t *ie = NULL;
+    S1AP_MME_UE_S1AP_ID_t *MME_UE_S1AP_ID = NULL;
+    S1AP_ENB_UE_S1AP_ID_t *ENB_UE_S1AP_ID = NULL;
+    S1AP_HandoverType_t *HandoverType = NULL;
+    // S1AP_E_RABSubjecttoDataForwardingList_t
+    //     *E_RABSubjecttoDataForwardingList = NULL;
+    S1AP_Target_ToSource_TransparentContainer_t
+        *Target_ToSource_TransparentContainer = NULL;
+
+    ogs_debug("HOP HandoverCommand");
+
+    memset(&pdu, 0, sizeof (S1AP_S1AP_PDU_t));
+    pdu.present = S1AP_S1AP_PDU_PR_successfulOutcome;
+    pdu.choice.successfulOutcome = CALLOC(1, sizeof(S1AP_SuccessfulOutcome_t));
+
+    successfulOutcome = pdu.choice.successfulOutcome;
+    successfulOutcome->procedureCode =
+        S1AP_ProcedureCode_id_HandoverPreparation;
+    successfulOutcome->criticality = S1AP_Criticality_reject;
+    successfulOutcome->value.present =
+        S1AP_SuccessfulOutcome__value_PR_HandoverCommand;
+
+    HandoverCommand = &successfulOutcome->value.choice.HandoverCommand;
+    ogs_assert(HandoverCommand);
+
+    ie = CALLOC(1, sizeof(S1AP_HandoverCommandIEs_t));
+    ASN_SEQUENCE_ADD(&HandoverCommand->protocolIEs, ie);
+
+    ie->id = S1AP_ProtocolIE_ID_id_MME_UE_S1AP_ID;
+    ie->criticality = S1AP_Criticality_reject;
+    ie->value.present = S1AP_HandoverCommandIEs__value_PR_MME_UE_S1AP_ID;
+
+    MME_UE_S1AP_ID = &ie->value.choice.MME_UE_S1AP_ID;
+
+    ie = CALLOC(1, sizeof(S1AP_HandoverCommandIEs_t));
+    ASN_SEQUENCE_ADD(&HandoverCommand->protocolIEs, ie);
+
+    ie->id = S1AP_ProtocolIE_ID_id_eNB_UE_S1AP_ID;
+    ie->criticality = S1AP_Criticality_reject;
+    ie->value.present = S1AP_HandoverCommandIEs__value_PR_ENB_UE_S1AP_ID;
+
+    ENB_UE_S1AP_ID = &ie->value.choice.ENB_UE_S1AP_ID;
+
+    ie = CALLOC(1, sizeof(S1AP_HandoverCommandIEs_t));
+    ASN_SEQUENCE_ADD(&HandoverCommand->protocolIEs, ie);
+
+    ie->id = S1AP_ProtocolIE_ID_id_HandoverType;
+    ie->criticality = S1AP_Criticality_reject;
+    ie->value.present = S1AP_HandoverCommandIEs__value_PR_HandoverType;
+
+    HandoverType = &ie->value.choice.HandoverType;
+
+    *MME_UE_S1AP_ID = 99;
+    if (enb_ue_id == 1) {
+        enb_ue_id = 2;
+    } else if (enb_ue_id == 2) {
+        enb_ue_id = 1;
+    } else {
+        ogs_error("ENB UE ID is not 1 or 2 -- FAIL");
+        ogs_asn_free(&asn_DEF_S1AP_S1AP_PDU, &pdu);
+        return NULL;
+    }
+    *ENB_UE_S1AP_ID = enb_ue_id;
+    *HandoverType = 0;
+
+    ie = CALLOC(1, sizeof(S1AP_HandoverCommandIEs_t));
+    ASN_SEQUENCE_ADD(&HandoverCommand->protocolIEs, ie);
+
+    ie->id = S1AP_ProtocolIE_ID_id_Target_ToSource_TransparentContainer;
+    ie->criticality = S1AP_Criticality_reject;
+    ie->value.present =
+        S1AP_HandoverCommandIEs__value_PR_Target_ToSource_TransparentContainer;
+
+    Target_ToSource_TransparentContainer =
+        &ie->value.choice.Target_ToSource_TransparentContainer;
+
+    ogs_s1ap_buffer_to_OCTET_STRING(container->buf,
+            container->size, Target_ToSource_TransparentContainer);
+
+    return ogs_s1ap_encode(&pdu);
+}
+
 ogs_pkbuf_t *s1ap_build_handover_preparation_failure(
         enb_ue_t *source_ue, S1AP_Cause_PR group, long cause)
 {

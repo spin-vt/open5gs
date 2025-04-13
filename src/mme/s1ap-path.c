@@ -723,6 +723,26 @@ int s1ap_send_handover_command(enb_ue_t *source_ue)
     return rv;
 }
 
+int s1ap_send_handover_command_hop(S1AP_ENB_UE_S1AP_ID_t enb_ue_id, 
+    OCTET_STRING_t *container)
+{
+    int rv;
+    ogs_pkbuf_t *s1apbuf = NULL;
+
+    ogs_debug("HOP HandoverCommand");
+
+    s1apbuf = s1ap_build_handover_command_hop(enb_ue_id, container);
+    if (!s1apbuf) {
+        ogs_error("s1ap_build_handover_command() failed");
+        return OGS_ERROR;
+    }
+
+    rv = s1ap_send_to_enb_ue_id(enb_ue_id, s1apbuf);
+    ogs_expect(rv == OGS_OK);
+
+    return rv;
+}
+
 int s1ap_send_handover_preparation_failure(
         enb_ue_t *source_ue, S1AP_Cause_PR group, long cause)
 {
