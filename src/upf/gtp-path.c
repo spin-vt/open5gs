@@ -55,46 +55,14 @@
 
 #define UPF_GTP_HANDLED     1
 
-#define ENB_GTP_IP "127.0.1.1"
-#define ENB_GTP_IP_2 "127.0.1.2"
+#define ENB_GTP_IP "192.168.31.191"
+
 static int gtp_fd;
 static int tun_fd;
 
 const uint8_t proxy_mac_addr[] = { 0x0e, 0x00, 0x00, 0x00, 0x00, 0x01 };
 
 static ogs_pkbuf_pool_t *packet_pool = NULL;
-
-static void upf_gtp_handle_multicast(ogs_pkbuf_t *recvbuf);
-
-static int check_framed_routes(upf_sess_t *sess, int family, uint32_t *addr)
-{
-    int i = 0;
-    ogs_ipsubnet_t *routes = family == AF_INET ?
-        sess->ipv4_framed_routes : sess->ipv6_framed_routes;
-
-    if (!routes)
-        return false;
-
-    for (i = 0; i < OGS_MAX_NUM_OF_FRAMED_ROUTES_IN_PDI; i++) {
-        uint32_t *sub = routes[i].sub;
-        uint32_t *mask = routes[i].mask;
-
-        if (!routes[i].family)
-            break;
-
-        if (family == AF_INET) {
-            if (sub[0] == (addr[0] & mask[0]))
-                return true;
-        } else {
-            if (sub[0] == (addr[0] & mask[0]) &&
-                sub[1] == (addr[1] & mask[1]) &&
-                sub[2] == (addr[2] & mask[2]) &&
-                sub[3] == (addr[3] & mask[3]))
-                return true;
-        }
-    }
-    return false;
-}
 
 static uint16_t _get_eth_type(uint8_t *data, uint len) {
     if (len > ETHER_HDR_LEN) {
@@ -108,13 +76,6 @@ static void _gtpv1_tun_recv_common_cb(
         short when, ogs_socket_t fd, bool has_eth, void *data)
 {
     ogs_pkbuf_t *recvbuf = NULL;
-
-    upf_sess_t *sess = NULL;
-    ogs_pfcp_pdr_t *pdr = NULL;
-    ogs_pfcp_pdr_t *fallback_pdr = NULL;
-    ogs_pfcp_far_t *far = NULL;
-    ogs_pfcp_user_plane_report_t report;
-    int i;
 
     recvbuf = ogs_tun_read(fd, packet_pool);
     if (!recvbuf) {
@@ -189,9 +150,10 @@ static void _gtpv1_tun_recv_common_cb(
     dst_addr.sin_family = AF_INET;
     dst_addr.sin_port = htons(2152);
     ogs_info("-----------> OK, i'm hitting the right branch.");
-    if (inet_pton(AF_INET, ENB_GTP_IP_2, &dst_addr.sin_addr) <= 0) {
+    if (inet_pton(AF_INET, ENB_GTP_IP, &dst_addr.sin_addr) <= 0) {
         ogs_error("----------> [DL] Couldn't build sockaddr for sendto() in bypass branch");
-        goto cleanup;
+        ogs_pkbuf_free(recvbuf);
+	return;
     }
 
     // I'm not sure what FD to use -- I assume the GTP Server is appropriate, but I see both 14 and 15 used often
@@ -208,6 +170,8 @@ static void _gtpv1_tun_recv_common_cb(
     
     ogs_pkbuf_free(recvbuf);
     return;
+cleanup:
+    ogs_pkbuf_free(recvbuf);
 }
 
 static void _gtpv1_tun_recv_cb(short when, ogs_socket_t fd, void *data)
@@ -225,7 +189,6 @@ static void _gtpv1_u_recv_cb(short when, ogs_socket_t fd, void *data)
     int len;
     ssize_t size;
     char buf1[OGS_ADDRSTRLEN];
-    char buf2[OGS_ADDRSTRLEN];
 
     upf_sess_t *sess = NULL;
 
@@ -331,17 +294,8 @@ static void _gtpv1_u_recv_cb(short when, ogs_socket_t fd, void *data)
             ogs_log_hexdump(OGS_LOG_ERROR, pkbuf->data, pkbuf->len);
         }
     } else if (header_desc.type == OGS_GTPU_MSGTYPE_GPDU) {
-        uint16_t eth_type = 0;
         struct ip *ip_h = NULL;
-        uint32_t *src_addr = NULL;
-        ogs_pfcp_object_t *pfcp_object = NULL;
-        ogs_pfcp_sess_t *pfcp_sess = NULL;
-        ogs_pfcp_pdr_t *pdr = NULL;
-        ogs_pfcp_far_t *far = NULL;
 
-        ogs_pfcp_subnet_t *subnet = NULL;
-        ogs_pfcp_dev_t *dev = NULL;
-        int i;
 
         ip_h = (struct ip *)pkbuf->data;
         ogs_assert(ip_h);
@@ -532,47 +486,3 @@ void upf_gtp_close(void)
     }
 }
 
-static void upf_gtp_handle_multicast(ogs_pkbuf_t *recvbuf)
-{
-    struct ip *ip_h =  NULL;
-    struct ip6_hdr *ip6_h = NULL;
-    ogs_pfcp_user_plane_report_t report;
-
-    ip_h = (struct ip *)recvbuf->data;
-    if (ip_h->ip_v == 6) {
-#if COMPILE_ERROR_IN_MAC_OS_X  /* Compiler error in Mac OS X platform */
-        ip6_h = (struct ip6_hdr *)recvbuf->data;
-        if (IN6_IS_ADDR_MULTICAST(&ip6_h->ip6_dst))
-#else
-        struct in6_addr ip6_dst;
-        ip6_h = (struct ip6_hdr *)recvbuf->data;
-        memcpy(&ip6_dst, &ip6_h->ip6_dst, sizeof(struct in6_addr));
-        if (IN6_IS_ADDR_MULTICAST(&ip6_dst))
-#endif
-        {
-            upf_sess_t *sess = NULL;
-
-            /* IPv6 Multicast */
-            ogs_list_for_each(&upf_self()->sess_list, sess) {
-                if (sess->ipv6) {
-                    /* PDN IPv6 is available */
-                    ogs_pfcp_pdr_t *pdr = NULL;
-
-                    ogs_list_for_each(&sess->pfcp.pdr_list, pdr) {
-                        if (pdr->src_if == OGS_PFCP_INTERFACE_CORE) {
-                            ogs_pkbuf_t *sendbuf = ogs_pkbuf_copy(recvbuf);
-                            ogs_assert(sendbuf);
-                            ogs_assert(true ==
-                                ogs_pfcp_up_handle_pdr(
-                                    pdr, OGS_GTPU_MSGTYPE_GPDU,
-                                    NULL, sendbuf, &report));
-                            break;
-                        }
-                    }
-
-                    return;
-                }
-            }
-        }
-    }
-}
