@@ -161,10 +161,26 @@ int esm_handle_pdn_connectivity_request(
             }
         }
 
+        // ogs_assert(OGS_OK ==
+        //     mme_gtp_send_create_session_request(enb_ue, sess, create_action));
+
         // replace the call to send Create Session Request. Requires manually setting some session/bearer state.
         ogs_info("Skipping send create session request and sending attaching accept immediately ...");
         sess->paa.session_type = 1;
-        sess->paa.addr = 33565962;
+
+        /* Dynamically allocate IP address from pool */
+        uint32_t allocated_ip = mme_ip_pool_alloc(sess->id);
+        if (allocated_ip == 0) {
+            ogs_error("Failed to allocate IP address from pool");
+            r = nas_eps_send_pdn_connectivity_reject(
+                    sess, OGS_NAS_ESM_CAUSE_NETWORK_FAILURE, create_action);
+            ogs_expect(r == OGS_OK);
+            ogs_assert(r != OGS_ERROR);
+            return OGS_ERROR;
+        }
+        sess->paa.addr = ntohl(allocated_ip); /* Convert from network to host byte order */
+
+        // Maybe assign these based on IP address (i.e., some hashing)?
         default_bearer->ebi = 5;
         default_bearer->qos.index = 9;
         default_bearer->sgw_s1u_teid = 29849;

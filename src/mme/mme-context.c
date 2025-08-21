@@ -143,6 +143,9 @@ void mme_context_init(void)
 
     ogs_list_init(&self.mme_ue_list);
 
+    /* Initialize IP pool for UE addresses */
+    mme_ip_pool_init();
+
     context_initialized = 1;
 }
 
@@ -173,6 +176,9 @@ void mme_context_final(void)
     ogs_hash_destroy(self.mme_s11_teid_hash);
     ogs_assert(self.mme_gn_teid_hash);
     ogs_hash_destroy(self.mme_gn_teid_hash);
+
+    /* Cleanup IP pool */
+    mme_ip_pool_final();
 
     ogs_pool_final(&m_tmsi_pool);
     ogs_pool_final(&mme_bearer_pool);
@@ -4311,6 +4317,11 @@ void mme_sess_remove(mme_sess_t *sess)
     mme_ue = mme_ue_find_by_id(sess->mme_ue_id);
     ogs_assert(mme_ue);
 
+    /* Free allocated IP address from pool */
+    if (sess->paa.addr != 0) {
+        mme_ip_pool_free(htonl(sess->paa.addr), sess->id); /* Convert to network byte order for pool tracking */
+    }
+
     ogs_list_remove(&mme_ue->sess_list, sess);
 
     mme_bearer_remove_all(sess);
@@ -5053,4 +5064,128 @@ static void stats_remove_mme_session(void)
     mme_metrics_inst_global_dec(MME_METR_GLOB_GAUGE_MME_SESS);
     num_of_mme_sess = num_of_mme_sess - 1;
     ogs_info("[Removed] Number of MME-Sessions is now %d", num_of_mme_sess);
+}
+
+/* IP Pool management functions implementation */
+void mme_ip_pool_init(void)
+{
+    mme_context_t *mme_ctx = &self;
+    
+    /* Initialize IP pool with default range 192.168.0.2 - 192.168.0.254 */
+    mme_ctx->ip_pool.pool_start = htonl(0xC0A80002); /* 192.168.0.2 */
+    mme_ctx->ip_pool.pool_end = htonl(0xC0A800FE);   /* 192.168.0.254 */
+    mme_ctx->ip_pool.pool_size = ntohl(mme_ctx->ip_pool.pool_end) - ntohl(mme_ctx->ip_pool.pool_start) + 1;
+    mme_ctx->ip_pool.next_ip = mme_ctx->ip_pool.pool_start;
+    
+    /* Create hash table for tracking allocated IPs */
+    mme_ctx->ip_pool.allocated_ips = ogs_hash_make();
+    ogs_assert(mme_ctx->ip_pool.allocated_ips);
+    
+    ogs_info("IP Pool initialized: %d addresses from 192.168.0.2 to 192.168.0.254", 
+             mme_ctx->ip_pool.pool_size);
+}
+
+void mme_ip_pool_final(void)
+{
+    mme_context_t *mme_ctx = &self;
+    
+    if (mme_ctx->ip_pool.allocated_ips) {
+        ogs_hash_destroy(mme_ctx->ip_pool.allocated_ips);
+        mme_ctx->ip_pool.allocated_ips = NULL;
+    }
+}
+
+uint32_t mme_ip_pool_alloc(ogs_pool_id_t mme_ue_id)
+{
+    mme_context_t *mme_ctx = mme_self();
+    uint32_t allocated_ip = 0;
+    uint32_t start_ip;
+    uint32_t attempts = 0;
+    ogs_pool_id_t *stored_ue_id;
+    
+    if (!mme_ctx->ip_pool.allocated_ips) {
+        ogs_error("IP pool not initialized");
+        return 0;
+    }
+    
+    start_ip = mme_ctx->ip_pool.next_ip;
+    
+    do {
+        /* Check if current IP is available */
+        stored_ue_id = ogs_hash_get(mme_ctx->ip_pool.allocated_ips, 
+                                   &mme_ctx->ip_pool.next_ip, sizeof(uint32_t));
+        
+        if (!stored_ue_id) {
+            /* IP is available, allocate it */
+            allocated_ip = mme_ctx->ip_pool.next_ip;
+            
+            /* Store the allocation */
+            stored_ue_id = ogs_malloc(sizeof(ogs_pool_id_t));
+            ogs_assert(stored_ue_id);
+            *stored_ue_id = mme_ue_id;
+            ogs_hash_set(mme_ctx->ip_pool.allocated_ips, &allocated_ip, 
+                        sizeof(uint32_t), stored_ue_id);
+            
+            ogs_info("Allocated IP %d.%d.%d.%d to UE ID %d", 
+                    (ntohl(allocated_ip) >> 24) & 0xFF,
+                    (ntohl(allocated_ip) >> 16) & 0xFF,
+                    (ntohl(allocated_ip) >> 8) & 0xFF,
+                    ntohl(allocated_ip) & 0xFF,
+                    mme_ue_id);
+            break;
+        }
+        
+        /* Move to next IP */
+        if (mme_ctx->ip_pool.next_ip == mme_ctx->ip_pool.pool_end) {
+            mme_ctx->ip_pool.next_ip = mme_ctx->ip_pool.pool_start;
+        } else {
+            mme_ctx->ip_pool.next_ip = htonl(ntohl(mme_ctx->ip_pool.next_ip) + 1);
+        }
+        
+        attempts++;
+        
+        /* Avoid infinite loop if pool is full */
+        if (attempts > mme_ctx->ip_pool.pool_size) {
+            ogs_error("IP pool exhausted - no available addresses");
+            return 0;
+        }
+        
+    } while (mme_ctx->ip_pool.next_ip != start_ip);
+    
+    /* Advance next_ip for next allocation */
+    if (allocated_ip != 0) {
+        if (mme_ctx->ip_pool.next_ip == mme_ctx->ip_pool.pool_end) {
+            mme_ctx->ip_pool.next_ip = mme_ctx->ip_pool.pool_start;
+        } else {
+            mme_ctx->ip_pool.next_ip = htonl(ntohl(mme_ctx->ip_pool.next_ip) + 1);
+        }
+    }
+    
+    return allocated_ip;
+}
+
+void mme_ip_pool_free(uint32_t ip_addr, ogs_pool_id_t mme_ue_id)
+{
+    mme_context_t *mme_ctx = mme_self();
+    ogs_pool_id_t *stored_ue_id;
+    
+    if (!mme_ctx->ip_pool.allocated_ips || ip_addr == 0) {
+        return;
+    }
+    
+    stored_ue_id = ogs_hash_get(mme_ctx->ip_pool.allocated_ips, 
+                               &ip_addr, sizeof(uint32_t));
+    
+    if (stored_ue_id && *stored_ue_id == mme_ue_id) {
+        ogs_hash_set(mme_ctx->ip_pool.allocated_ips, &ip_addr, 
+                    sizeof(uint32_t), NULL);
+        ogs_free(stored_ue_id);
+        
+        ogs_info("Freed IP %d.%d.%d.%d from UE ID %d", 
+                (ntohl(ip_addr) >> 24) & 0xFF,
+                (ntohl(ip_addr) >> 16) & 0xFF,
+                (ntohl(ip_addr) >> 8) & 0xFF,
+                ntohl(ip_addr) & 0xFF,
+                mme_ue_id);
+    }
 }

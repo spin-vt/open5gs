@@ -158,6 +158,15 @@ typedef struct mme_context_s {
     ogs_hash_t *mme_s11_teid_hash;  /* hash table (MME-S11-TEID : MME_UE) */
     ogs_hash_t *mme_gn_teid_hash;  /* hash table (MME-GN-TEID : MME_UE) */
 
+    /* IP Address Pool for UE allocation */
+    struct {
+        uint32_t pool_start;        /* Starting IP address (network byte order) */
+        uint32_t pool_end;          /* Ending IP address (network byte order) */
+        uint32_t pool_size;         /* Total number of IPs in pool */
+        uint32_t next_ip;           /* Next IP to allocate (network byte order) */
+        ogs_hash_t *allocated_ips;  /* hash table (IP : MME_UE_ID) for tracking */
+    } ip_pool;
+
     struct {
         struct {
             ogs_time_t value;       /* Timer Value(Seconds) */
@@ -1127,6 +1136,12 @@ void mme_ebi_pool_clear(mme_ue_t *mme_ue);
 
 uint8_t mme_selected_int_algorithm(mme_ue_t *mme_ue);
 uint8_t mme_selected_enc_algorithm(mme_ue_t *mme_ue);
+
+/* IP Pool management functions */
+void mme_ip_pool_init(void);
+void mme_ip_pool_final(void);
+uint32_t mme_ip_pool_alloc(ogs_pool_id_t mme_ue_id);
+void mme_ip_pool_free(uint32_t ip_addr, ogs_pool_id_t mme_ue_id);
 
 #ifdef __cplusplus
 }
