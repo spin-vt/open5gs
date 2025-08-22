@@ -5071,9 +5071,9 @@ void mme_ip_pool_init(void)
 {
     mme_context_t *mme_ctx = &self;
     
-    /* Initialize IP pool with default range 192.168.0.2 - 192.168.0.254 */
-    mme_ctx->ip_pool.pool_start = htonl(0xC0A80002); /* 192.168.0.2 */
-    mme_ctx->ip_pool.pool_end = htonl(0xC0A800FE);   /* 192.168.0.254 */
+    /* Initialize IP pool with default range 10.45.0.2 - 10.45.0.254 */
+    mme_ctx->ip_pool.pool_start = htonl(0x0A2D0002); /* 10.45.0.2 */
+    mme_ctx->ip_pool.pool_end = htonl(0x0A2D00FE);   /* 10.45.0.254 */
     mme_ctx->ip_pool.pool_size = ntohl(mme_ctx->ip_pool.pool_end) - ntohl(mme_ctx->ip_pool.pool_start) + 1;
     mme_ctx->ip_pool.next_ip = mme_ctx->ip_pool.pool_start;
     
@@ -5081,7 +5081,7 @@ void mme_ip_pool_init(void)
     mme_ctx->ip_pool.allocated_ips = ogs_hash_make();
     ogs_assert(mme_ctx->ip_pool.allocated_ips);
     
-    ogs_info("IP Pool initialized: %d addresses from 192.168.0.2 to 192.168.0.254", 
+    ogs_info("IP Pool initialized: %d addresses from 10.45.0.2 to 10.45.0.254", 
              mme_ctx->ip_pool.pool_size);
 }
 
