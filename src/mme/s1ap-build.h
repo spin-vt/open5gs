@@ -45,7 +45,7 @@ ogs_pkbuf_t *s1ap_build_ue_context_modification_request(mme_ue_t *mme_ue);
 ogs_pkbuf_t *s1ap_build_ue_context_release_command(
     enb_ue_t *enb_ue, S1AP_Cause_PR group, long cause);
 ogs_pkbuf_t *s1ap_build_ue_context_release_command_hop(
-    S1AP_ENB_UE_S1AP_ID_t enb_ue_id, S1AP_Cause_PR group, long cause);
+    S1AP_MME_UE_S1AP_ID_t mme_ue_id, S1AP_Cause_PR group, long cause);
 
 ogs_pkbuf_t *s1ap_build_e_rab_setup_request(
     mme_bearer_t *bearer, ogs_pkbuf_t *esmbuf);
@@ -71,7 +71,7 @@ ogs_pkbuf_t *s1ap_build_path_switch_failure(
     S1AP_Cause_PR group, long cause);
 
 ogs_pkbuf_t *s1ap_build_handover_command(enb_ue_t *source_ue);
-ogs_pkbuf_t *s1ap_build_handover_command_hop(S1AP_ENB_UE_S1AP_ID_t enb_ue_id,
+ogs_pkbuf_t *s1ap_build_handover_command_hop(S1AP_MME_UE_S1AP_ID_t mme_ue_id, S1AP_ENB_UE_S1AP_ID_t enb_ue_id,
         OCTET_STRING_t *container);
 
 ogs_pkbuf_t *s1ap_build_handover_preparation_failure(
@@ -86,7 +86,7 @@ ogs_pkbuf_t *s1ap_build_handover_cancel_ack(
     enb_ue_t *source_ue);
 
 ogs_pkbuf_t *s1ap_build_mme_status_transfer(
-    S1AP_ENB_UE_S1AP_ID_t enb_ue_s1ap_id,
+    S1AP_MME_UE_S1AP_ID_t mme_ue_s1ap_id,
     S1AP_ENB_StatusTransfer_TransparentContainer_t
         *enb_statustransfer_transparentContainer);
 

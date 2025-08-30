@@ -535,22 +535,32 @@ int s1ap_send_ue_context_release_command(
 }
 
 int s1ap_send_ue_context_release_command_hop(
-    S1AP_ENB_UE_S1AP_ID_t enb_ue_id, S1AP_Cause_PR group, long cause,
-    uint8_t action, ogs_time_t duration)
+    S1AP_MME_UE_S1AP_ID_t mme_ue_id, S1AP_Cause_PR group, long cause,
+    uint8_t action, ogs_time_t duration, mme_enb_t *from_enb)
 {
     int rv;
     ogs_pkbuf_t *s1apbuf = NULL;
 
     ogs_debug("UEContextReleaseCommand");
 
-    s1apbuf = s1ap_build_ue_context_release_command_hop(enb_ue_id, group, cause);
+    s1apbuf = s1ap_build_ue_context_release_command_hop(mme_ue_id, group, cause);
     if (!s1apbuf) {
         ogs_error("s1ap_build_ue_context_release_command() failed");
         return OGS_ERROR;
     }
 
+    mme_enb_t *enb_to_send = NULL;
+    if (from_enb->enb_id == ENB_1->enb_id) {
+      ogs_info("From ENB_1, so send to ENB_2");
+      enb_to_send = ENB_2;
+    } else {
+      ogs_info("NOT from ENB_1, so send to ENB_1");
+      enb_to_send = ENB_1;
+    }
+
     ogs_info("------ REMOVING TIMER AND DELAYED SEND.....");
-    rv = s1ap_send_to_enb_ue_id(enb_ue_id, s1apbuf);
+    //rv = s1ap_send_to_enb_ue_id(enb_ue_id, s1apbuf);
+    rv = s1ap_send_to_enb(enb_to_send, s1apbuf, enb_to_send->ostream_id);
     // rv = s1ap_delayed_send_to_enb_ue(enb_ue, s1apbuf, duration);
     ogs_expect(rv == OGS_OK);
 
@@ -749,8 +759,8 @@ int s1ap_send_handover_command(enb_ue_t *source_ue)
     return rv;
 }
 
-int s1ap_send_handover_command_hop(S1AP_ENB_UE_S1AP_ID_t enb_ue_id, 
-    OCTET_STRING_t *container)
+int s1ap_send_handover_command_hop(S1AP_MME_UE_S1AP_ID_t mme_ue_id, S1AP_ENB_UE_S1AP_ID_t enb_ue_id, 
+    OCTET_STRING_t *container, mme_enb_t *from_enb)
 {
     int rv;
     ogs_pkbuf_t *s1apbuf = NULL;
@@ -758,13 +768,24 @@ int s1ap_send_handover_command_hop(S1AP_ENB_UE_S1AP_ID_t enb_ue_id,
     ogs_debug("HOP HandoverCommand");
 
     ogs_info("--- building handover command hop from send_ho_com_hop");
-    s1apbuf = s1ap_build_handover_command_hop(enb_ue_id, container);
+    s1apbuf = s1ap_build_handover_command_hop(mme_ue_id, enb_ue_id, container);
     if (!s1apbuf) {
         ogs_error("s1ap_build_handover_command() failed");
         return OGS_ERROR;
     }
+
+    mme_enb_t *enb_to_send = NULL;
+    if (from_enb->enb_id == ENB_1->enb_id) {
+      ogs_info("From ENB_1, so send to ENB_2");
+      enb_to_send = ENB_2;
+    } else {
+      ogs_info("NOT from ENB_1, so send to ENB_1");
+      enb_to_send = ENB_1;
+    }
+
     ogs_info("--- sending to enb using UE ID from send_ho_com_hop");
-    rv = s1ap_send_to_enb_ue_id(enb_ue_id, s1apbuf);
+    //rv = s1ap_send_to_enb_ue_id(enb_ue_id, s1apbuf);
+    rv = s1ap_send_to_enb(enb_to_send, s1apbuf, enb_to_send->ostream_id);
     ogs_expect(rv == OGS_OK);
 
     return rv;
@@ -917,9 +938,10 @@ int s1ap_send_handover_request(
 }
 
 int s1ap_send_mme_status_transfer(
-        S1AP_ENB_UE_S1AP_ID_t enb_ue_s1ap_id,
+        S1AP_MME_UE_S1AP_ID_t mme_ue_s1ap_id,
         S1AP_ENB_StatusTransfer_TransparentContainer_t
-            *enb_statustransfer_transparentContainer)
+            *enb_statustransfer_transparentContainer,
+	mme_enb_t *from_enb)
 {
     int rv;
     ogs_pkbuf_t *s1apbuf = NULL;
@@ -931,14 +953,24 @@ int s1ap_send_mme_status_transfer(
     //     return OGS_NOTFOUND;
     // }
 
-    s1apbuf = s1ap_build_mme_status_transfer(enb_ue_s1ap_id,
+    s1apbuf = s1ap_build_mme_status_transfer(mme_ue_s1ap_id,
             enb_statustransfer_transparentContainer);
     if (!s1apbuf) {
         ogs_error("s1ap_build_mme_status_transfer() failed");
         return OGS_ERROR;
     }
 
-    rv = s1ap_send_to_enb_ue_id(enb_ue_s1ap_id, s1apbuf);
+    mme_enb_t *enb_to_send = NULL;
+    if (from_enb->enb_id == ENB_1->enb_id) {
+      ogs_info("From ENB_1, so send to ENB_2");
+      enb_to_send = ENB_2;
+    } else {
+      ogs_info("NOT from ENB_1, so send to ENB_1");
+      enb_to_send = ENB_1;
+    }
+
+    //rv = s1ap_send_to_enb_ue_id(enb_ue_s1ap_id, s1apbuf);
+    rv = s1ap_send_to_enb(enb_to_send, s1apbuf, enb_to_send->ostream_id);
     ogs_expect(rv == OGS_OK);
 
     return rv;

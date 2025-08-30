@@ -3029,6 +3029,7 @@ void s1ap_handle_handover_request_ack(
 
     S1AP_HandoverRequestAcknowledgeIEs_t *ie = NULL;
     S1AP_MME_UE_S1AP_ID_t *MME_UE_S1AP_ID = NULL;
+    S1AP_MME_UE_S1AP_ID_t mme_ue_s1ap_id;
     S1AP_ENB_UE_S1AP_ID_t *ENB_UE_S1AP_ID = NULL;
     S1AP_ENB_UE_S1AP_ID_t enb_ue_s1ap_id;
     S1AP_E_RABAdmittedList_t *E_RABAdmittedList = NULL;
@@ -3053,6 +3054,7 @@ void s1ap_handle_handover_request_ack(
         switch (ie->id) {
         case S1AP_ProtocolIE_ID_id_MME_UE_S1AP_ID:
             MME_UE_S1AP_ID = &ie->value.choice.MME_UE_S1AP_ID;
+	    mme_ue_s1ap_id = ie->value.choice.MME_UE_S1AP_ID;
             break;
         case S1AP_ProtocolIE_ID_id_eNB_UE_S1AP_ID:
             ENB_UE_S1AP_ID = &ie->value.choice.ENB_UE_S1AP_ID;
@@ -3119,7 +3121,8 @@ void s1ap_handle_handover_request_ack(
     }
 
     ogs_info(" --- Sending handover command hop from handler");
-    r = s1ap_send_handover_command_hop(enb_ue_s1ap_id, Target_ToSource_TransparentContainer);
+
+    r = s1ap_send_handover_command_hop(mme_ue_s1ap_id, enb_ue_s1ap_id, Target_ToSource_TransparentContainer, enb);
     free(container);
     ogs_expect(r == OGS_OK);
     ogs_assert(r != OGS_ERROR);
@@ -3462,8 +3465,8 @@ void s1ap_handle_enb_status_transfer(
     // ogs_debug("    Target : ENB_UE_S1AP_ID[%d] MME_UE_S1AP_ID[%d]",
     //         target_ue->enb_ue_s1ap_id, target_ue->mme_ue_s1ap_id);
 
-    r = s1ap_send_mme_status_transfer(*ENB_UE_S1AP_ID,
-            ENB_StatusTransfer_TransparentContainer);
+    r = s1ap_send_mme_status_transfer(*MME_UE_S1AP_ID,
+            ENB_StatusTransfer_TransparentContainer, enb);
     ogs_expect(r == OGS_OK);
     /* ogs_asn_copy_ie() could be failed from received packet.
      * So we should not use ogs_assert(r != OGS_ERROR).*/
@@ -3576,11 +3579,11 @@ void s1ap_handle_handover_notification(
     cell_ID = &EUTRAN_CGI->cell_ID;
     ogs_assert(cell_ID);
 
-    r = s1ap_send_ue_context_release_command_hop(*ENB_UE_S1AP_ID,
+    r = s1ap_send_ue_context_release_command_hop(*MME_UE_S1AP_ID,
             S1AP_Cause_PR_radioNetwork,
             S1AP_CauseRadioNetwork_successful_handover,
             S1AP_UE_CTX_REL_S1_HANDOVER_COMPLETE,
-            ogs_local_conf()->time.handover.duration);
+            ogs_local_conf()->time.handover.duration, enb);
     ogs_expect(r == OGS_OK);
     ogs_assert(r != OGS_ERROR);
 }

@@ -1039,7 +1039,7 @@ ogs_pkbuf_t *s1ap_build_ue_context_release_command(
 }
 
 ogs_pkbuf_t *s1ap_build_ue_context_release_command_hop(
-    S1AP_ENB_UE_S1AP_ID_t enb_ue_id, S1AP_Cause_PR group, long cause)
+    S1AP_MME_UE_S1AP_ID_t mme_ue_id, S1AP_Cause_PR group, long cause)
 {
     S1AP_S1AP_PDU_t pdu;
     S1AP_InitiatingMessage_t *initiatingMessage = NULL;
@@ -1085,15 +1085,8 @@ ogs_pkbuf_t *s1ap_build_ue_context_release_command_hop(
     UE_S1AP_IDs->present = S1AP_UE_S1AP_IDs_PR_uE_S1AP_ID_pair;
     UE_S1AP_IDs->choice.uE_S1AP_ID_pair =
         CALLOC(1, sizeof(S1AP_UE_S1AP_ID_pair_t));
-    UE_S1AP_IDs->choice.uE_S1AP_ID_pair->mME_UE_S1AP_ID = 99;
-    
-    uint32_t enb_ue_s1ap_id = 0;
-    if (enb_ue_id == 1) {
-        enb_ue_s1ap_id = 2;
-    } else if (enb_ue_id == 2) {
-        enb_ue_s1ap_id = 1;
-    }
-    UE_S1AP_IDs->choice.uE_S1AP_ID_pair->eNB_UE_S1AP_ID = enb_ue_s1ap_id;
+    UE_S1AP_IDs->choice.uE_S1AP_ID_pair->mME_UE_S1AP_ID = mme_ue_id;
+    UE_S1AP_IDs->choice.uE_S1AP_ID_pair->eNB_UE_S1AP_ID = 1; // this value shouldn't matter
 
     Cause->present = group;
     Cause->choice.radioNetwork = cause;
@@ -2174,7 +2167,7 @@ ogs_pkbuf_t *s1ap_build_handover_command(enb_ue_t *source_ue)
     return ogs_s1ap_encode(&pdu);
 }
 
-ogs_pkbuf_t *s1ap_build_handover_command_hop(S1AP_ENB_UE_S1AP_ID_t enb_ue_id,
+ogs_pkbuf_t *s1ap_build_handover_command_hop(S1AP_MME_UE_S1AP_ID_t mme_ue_id, S1AP_ENB_UE_S1AP_ID_t enb_ue_id,
         S1AP_Target_ToSource_TransparentContainer_t *container)
 {
     // int rv;
@@ -2235,20 +2228,13 @@ ogs_pkbuf_t *s1ap_build_handover_command_hop(S1AP_ENB_UE_S1AP_ID_t enb_ue_id,
 
     HandoverType = &ie->value.choice.HandoverType;
 
-    *MME_UE_S1AP_ID = 99;
-
-    int enb_ue_s1ap_id= 0;
-    if (enb_ue_id == 1) {
-        enb_ue_s1ap_id = 2;
-    } else if (enb_ue_id == 2) {
-        enb_ue_s1ap_id = 1;
-    } else {
-        ogs_error("ENB UE ID is not 1 or 2 -- FAIL");
-        ogs_asn_free(&asn_DEF_S1AP_S1AP_PDU, &pdu);
-        return NULL;
-    }
-    *ENB_UE_S1AP_ID = enb_ue_s1ap_id;
-    *HandoverType = 0;
+    ogs_info("---- MME_UE_ID: %ld\n", mme_ue_id);
+    int mme_ue_s1ap_id = mme_ue_id;
+    *MME_UE_S1AP_ID = mme_ue_s1ap_id;
+    ogs_info("MME UE S1AP ID ptr set\n");
+ 
+    *ENB_UE_S1AP_ID = 1; // this value shouldn't matter
+    *HandoverType = 0; // intraLTE
 
     ie = CALLOC(1, sizeof(S1AP_HandoverCommandIEs_t));
     ASN_SEQUENCE_ADD(&HandoverCommand->protocolIEs, ie);
@@ -2652,7 +2638,7 @@ ogs_pkbuf_t *s1ap_build_handover_cancel_ack(enb_ue_t *source_ue)
 }
 
 ogs_pkbuf_t *s1ap_build_mme_status_transfer(
-        S1AP_ENB_UE_S1AP_ID_t enb_ue_s1ap_id,
+        S1AP_MME_UE_S1AP_ID_t mme_ue_s1ap_id,
         S1AP_ENB_StatusTransfer_TransparentContainer_t
             *enb_statustransfer_transparentContainer)
 {
@@ -2714,17 +2700,9 @@ ogs_pkbuf_t *s1ap_build_mme_status_transfer(
     ENB_StatusTransfer_TransparentContainer =
         &ie->value.choice.ENB_StatusTransfer_TransparentContainer;
 
-    *MME_UE_S1AP_ID = 99; // random value, shouldn't matter
-    if (enb_ue_s1ap_id == 1) {
-        enb_ue_s1ap_id = 2;
-    } else if (enb_ue_s1ap_id == 2) {
-        enb_ue_s1ap_id = 1;
-    } else {
-        ogs_error("ENB UE ID is not 1 or 2 -- FAIL");
-        ogs_asn_free(&asn_DEF_S1AP_S1AP_PDU, &pdu);
-        return NULL;
-    }
-    *ENB_UE_S1AP_ID = enb_ue_s1ap_id;
+    *MME_UE_S1AP_ID = mme_ue_s1ap_id; // use the parameter as mme_ue_s1ap_id
+    
+    *ENB_UE_S1AP_ID = 1; // random value, shouldn't matter....
 
     // ogs_debug("    Target : ENB_UE_S1AP_ID[%d] MME_UE_S1AP_ID[%d]",
     //         target_ue->enb_ue_s1ap_id, target_ue->mme_ue_s1ap_id);

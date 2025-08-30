@@ -63,8 +63,8 @@ int s1ap_send_ue_context_release_command(
     enb_ue_t *enb_ue, S1AP_Cause_PR group, long cause,
     uint8_t action, ogs_time_t duration);
 int s1ap_send_ue_context_release_command_hop(
-    S1AP_ENB_UE_S1AP_ID_t enb_ue_id, S1AP_Cause_PR group, long cause,
-    uint8_t action, ogs_time_t duration);
+    S1AP_MME_UE_S1AP_ID_t mme_ue_id, S1AP_Cause_PR group, long cause,
+    uint8_t action, ogs_time_t duration, mme_enb_t *from_enb);
 
 int s1ap_send_paging(mme_ue_t *mme_ue, S1AP_CNDomain_t cn_domain);
 
@@ -81,8 +81,8 @@ int s1ap_send_path_switch_ack(
         mme_ue_t *mme_ue, bool e_rab_to_switched_in_uplink_list);
 
 int s1ap_send_handover_command(enb_ue_t *source_ue);
-int s1ap_send_handover_command_hop(S1AP_ENB_UE_S1AP_ID_t enb_ue_id,
-        OCTET_STRING_t *container);
+int s1ap_send_handover_command_hop(S1AP_MME_UE_S1AP_ID_t mme_ue_id, S1AP_ENB_UE_S1AP_ID_t enb_ue_id,
+        OCTET_STRING_t *container, mme_enb_t *from_enb);
 int s1ap_send_handover_preparation_failure(
         enb_ue_t *source_ue, S1AP_Cause_PR group, long cause);
 
@@ -95,9 +95,10 @@ int s1ap_send_handover_request(
 int s1ap_send_handover_cancel_ack(enb_ue_t *source_ue);
 
 int s1ap_send_mme_status_transfer(
-        S1AP_ENB_UE_S1AP_ID_t enb_ue_s1ap_id,
+        S1AP_MME_UE_S1AP_ID_t mme_ue_s1ap_id,
         S1AP_ENB_StatusTransfer_TransparentContainer_t
-            *enb_statustransfer_transparentContainer);
+            *enb_statustransfer_transparentContainer,
+	mme_enb_t *from_enb);
 int s1ap_send_error_indication(
         mme_enb_t *enb,
         S1AP_MME_UE_S1AP_ID_t *mme_ue_s1ap_id,
