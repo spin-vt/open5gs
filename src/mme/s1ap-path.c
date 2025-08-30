@@ -812,7 +812,7 @@ int s1ap_send_handover_request(
     enb_ue_source_associate_target(source_ue, target_ue);
 
     s1apbuf = s1ap_build_handover_request(
-            target_ue, handovertype, cause,
+            source_ue, handovertype, cause,
             source_totarget_transparentContainer);
     if (!s1apbuf) {
         ogs_error("s1ap_build_handover_request() failed");
